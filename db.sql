@@ -9,16 +9,16 @@ CREATE TABLE users (
   username VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   password VARCHAR(255) NOT NULL,
-  created_at DATE DEFAULT current_date,
-  updated_at DATE DEFAULT current_date
+  created_at TIMESTAMP DEFAULT current_timestamp,
+  updated_at TIMESTAMP DEFAULT current_timestamp
 );
 
 CREATE TABLE workouts (
 	id SERIAL PRIMARY KEY,
   	name VARCHAR(255) DEFAULT '',
-	user_id INT REFERENCES users (id) ON DELETE CASCADE,
-  	created_at DATE DEFAULT current_date,
-  	updated_at DATE DEFAULT current_date
+	user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  	created_at TIMESTAMP DEFAULT current_timestamp,
+  	updated_at TIMESTAMP DEFAULT current_timestamp
 );
 
 CREATE TABLE movements (
@@ -29,19 +29,19 @@ CREATE TABLE movements (
 CREATE TABLE user_movements (
 	id SERIAL PRIMARY KEY,
 	movement_id INT REFERENCES movements(id) ON DELETE CASCADE,
-  	user_id INT REFERENCES users (id) ON DELETE CASCADE,
-	created_at DATE DEFAULT current_date,
-  	updated_at DATE DEFAULT current_date
+  	user_id INT REFERENCES users(id) ON DELETE CASCADE,
+	created_at TIMESTAMP DEFAULT current_timestamp,
+  	updated_at TIMESTAMP DEFAULT current_timestamp
 );
 
 CREATE TABLE sets (
   	id SERIAL PRIMARY KEY,
   	reps INT NOT NULL,
-  	weight INT NOT NULL,
-  	user_id INT REFERENCES users (id) ON DELETE CASCADE,
-  	user_movement_id INT REFERENCES user_movements (id) ON DELETE CASCADE,
+  	weight INT,
+  	user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  	user_movement_id INT REFERENCES user_movements(id) ON DELETE CASCADE,
   	workout_id INT REFERENCES workouts (id) ON DELETE CASCADE,
-  	created_at DATE DEFAULT current_date,
-  	updated_at DATE DEFAULT current_date
+  	created_at TIMESTAMP DEFAULT current_timestamp,
+  	updated_at TIMESTAMP DEFAULT current_timestamp
 );
 
