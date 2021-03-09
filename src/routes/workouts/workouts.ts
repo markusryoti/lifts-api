@@ -2,7 +2,7 @@ import express from 'express';
 const router = express.Router();
 
 import db from '../../db';
-import { workoutJsonFormatter } from './jsonFormatter';
+import { workoutSetRowObjectsToWorkouts } from './jsonFormatter';
 
 interface DbWorkoutObject {
   id: number;
@@ -40,10 +40,10 @@ router.get('/', async (req: any, res: any) => {
   const { userId } = req.body;
   try {
     const sql = `
-      SELECT sets.id AS set_id, reps, weight,
-          workouts.id AS workout_id,
-              workouts.created_at, workouts.name,
-              movements.name AS name
+      SELECT
+        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
+        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
+        movements.name AS movement_name, sets.created_at AS set_created_at
       FROM sets
       JOIN users ON sets.user_id = users.id
       JOIN workouts ON sets.workout_id = workouts.id
@@ -52,7 +52,7 @@ router.get('/', async (req: any, res: any) => {
       WHERE users.id = $1 
     `;
     const result = await db.query(sql, [userId]);
-    const transformedWorkouts = workoutJsonFormatter(result.rows);
+    const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
     res.send(transformedWorkouts);
   } catch (error) {
     console.log(error.stack);
@@ -65,10 +65,10 @@ router.get('/:workoutId', async (req: any, res: any) => {
   const { userId } = req.body;
   try {
     const sql = `
-      SELECT sets.id AS set_id, reps, weight,
-          workouts.id AS workout_id,
-              workouts.created_at, workouts.name,
-              movements.name AS name
+      SELECT
+        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
+        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
+        movements.name AS movement_name, sets.created_at AS set_created_at
       FROM sets
       JOIN users ON sets.user_id = users.id
       JOIN workouts ON sets.workout_id = workouts.id
@@ -77,7 +77,7 @@ router.get('/:workoutId', async (req: any, res: any) => {
       WHERE users.id = $1 AND sets.workout_id = $2
     `;
     const result = await db.query(sql, [userId, workoutId]);
-    const transformedWorkouts = workoutJsonFormatter(result.rows);
+    const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
     res.send(transformedWorkouts);
   } catch (error) {
     console.log(error.stack);
@@ -85,7 +85,6 @@ router.get('/:workoutId', async (req: any, res: any) => {
   }
 });
 
-// FIX SQL
 router.post('/:workoutId/sets/', async (req: any, res: any) => {
   const { workoutId } = req.params;
   const { reps, weight, userId, userMovementId } = req.body;

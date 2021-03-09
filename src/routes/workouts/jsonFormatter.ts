@@ -1,15 +1,40 @@
 interface WorkoutJsonItem {
   workout_id: string;
+  workout_name: string;
+  workout_created_at: Date;
+  set_id: string;
+  reps: number;
+  weight: number;
+  movement_name: string;
+  set_created_at: Date;
 }
 
-export const workoutJsonFormatter = (json: Array<WorkoutJsonItem>) => {
+export const workoutSetRowObjectsToWorkouts = (
+  json: Array<WorkoutJsonItem>
+) => {
   const workouts: any = {};
+
+  //  Loop through the json and convert set rows to workout objectss
   json.forEach((item: WorkoutJsonItem) => {
     const workoutId = item.workout_id.toString();
+    const {
+      workout_name,
+      workout_created_at,
+      set_id,
+      reps,
+      weight,
+      movement_name,
+      set_created_at,
+    } = item;
+
+    const workoutData = { workout_name, workout_created_at };
+    const setData = { set_id, reps, weight, movement_name, set_created_at };
+
     if (workouts[workoutId] === undefined) {
-      workouts[workoutId] = [item];
+      workouts[workoutId] = workoutData;
+      workouts[workoutId]['sets'] = [setData];
     } else {
-      workouts[workoutId].push(item);
+      workouts[workoutId]['sets'].push({ setData });
     }
   });
   return workouts;
