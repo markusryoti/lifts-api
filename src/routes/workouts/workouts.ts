@@ -2,42 +2,13 @@ import express from 'express';
 const router = express.Router();
 
 import db from '../../db';
+import auth from '../../middleware/auth';
 import { workoutSetRowObjectsToWorkouts } from './jsonFormatter';
+import { DatabaseNewWorkoutResponse, DbWorkoutObject } from './types';
 
-interface DbWorkoutObject {
-  id: number;
-  name: string;
-  user_id: number;
-  created_at: Date;
-  updated_at: Date;
-}
+router.get('/', auth, async (req: any, res: any) => {
+  const userId = req.user.id;
 
-interface DatabaseResponse {
-  rows: DbWorkoutObject[];
-}
-
-router.post('/new', async (req: any, res: any) => {
-  const { userId, name } = req.body;
-  if (!userId) {
-    res.status(400).send('Invalid request, must include user');
-    return;
-  }
-  const sql =
-    'INSERT INTO workouts (user_id, name) VALUES ($1, $2) RETURNING *';
-  const values = [userId, name];
-
-  try {
-    const result: DatabaseResponse = await db.query(sql, values);
-    const workout: DbWorkoutObject = result.rows[0];
-    res.send(workout);
-  } catch (error) {
-    console.log(error.stack);
-    res.sendStatus(500);
-  }
-});
-
-router.get('/', async (req: any, res: any) => {
-  const { userId } = req.body;
   try {
     const sql = `
       SELECT
@@ -50,6 +21,7 @@ router.get('/', async (req: any, res: any) => {
       JOIN user_movements ON user_movements.id = sets.user_movement_id
       JOIN movements ON user_movements.movement_id = movements.id
       WHERE users.id = $1 
+      ORDER BY workouts.created_at DESC
     `;
     const result = await db.query(sql, [userId]);
     const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
@@ -60,9 +32,10 @@ router.get('/', async (req: any, res: any) => {
   }
 });
 
-router.get('/:workoutId', async (req: any, res: any) => {
+router.get('/:workoutId', auth, async (req: any, res: any) => {
+  const userId = req.user.id;
   const { workoutId } = req.params;
-  const { userId } = req.body;
+
   try {
     const sql = `
       SELECT
@@ -75,6 +48,7 @@ router.get('/:workoutId', async (req: any, res: any) => {
       JOIN user_movements ON user_movements.id = sets.user_movement_id
       JOIN movements ON user_movements.movement_id = movements.id
       WHERE users.id = $1 AND sets.workout_id = $2
+      ORDER BY workouts.created_at DESC
     `;
     const result = await db.query(sql, [userId, workoutId]);
     const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
@@ -85,9 +59,31 @@ router.get('/:workoutId', async (req: any, res: any) => {
   }
 });
 
+router.post('/new', auth, async (req: any, res: any) => {
+  const userId = req.user.id;
+
+  let { name } = req.body;
+  name = name === undefined ? null : name;
+
+  const sql =
+    'INSERT INTO workouts (user_id, name) VALUES ($1, $2) RETURNING *';
+  const values = [userId, name];
+
+  try {
+    const result: DatabaseNewWorkoutResponse = await db.query(sql, values);
+    const workout: DbWorkoutObject = result.rows[0];
+    res.send(workout);
+  } catch (error) {
+    console.log(error.stack);
+    res.sendStatus(500);
+  }
+});
+
 router.post('/:workoutId/sets/', async (req: any, res: any) => {
+  const userId = req.user.id;
+
   const { workoutId } = req.params;
-  const { reps, weight, userId, userMovementId } = req.body;
+  const { reps, weight, userMovementId } = req.body;
 
   try {
     if (!inputsAreValid(reps, userId, userMovementId)) {
@@ -99,7 +95,8 @@ router.post('/:workoutId/sets/', async (req: any, res: any) => {
 
     const weightToAdd = weight === undefined ? null : weight;
     const sqlAdd = `
-    INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+    INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id)
+    VALUES ($1, $2, $3, $4, $5) RETURNING *`;
     const values = [reps, weightToAdd, userId, userMovementId, workoutId];
 
     const result = await db.query(sqlAdd, values);

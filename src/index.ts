@@ -1,5 +1,8 @@
 import express from 'express';
+import cors from 'cors';
+
 import db from './db';
+
 import login from './routes/login/login';
 import movements from './routes/movements/movements';
 import signup from './routes/signup/signup';
@@ -9,6 +12,7 @@ import workouts from './routes/workouts/workouts';
 const app = express();
 const PORT = 5000;
 
+app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
 app.use('/signup', signup);
 app.use('/login', login);

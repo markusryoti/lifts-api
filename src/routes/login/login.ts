@@ -1,20 +1,12 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+dotenv.config();
+
 const router = express.Router();
 
 import db from '../../db';
-
-interface DbUserObject {
-  id: number;
-  username: string;
-  email: string;
-  password?: string;
-  created_at: Date;
-  updated_at: Date;
-}
-
-interface DatabaseResponse {
-  rows: DbUserObject[];
-}
+import { DatabaseResponse, DbUserObject } from './types';
 
 const credentialsAreGiven = (
   username: string | undefined,
@@ -43,20 +35,36 @@ router.post('/', async (req: any, res: any) => {
         sql = 'SELECT * FROM users WHERE email = $1';
         result = await db.query(sql, [email]);
       } else {
-        res.sendStatus(500);
+        res.sendStatus(401);
         return;
       }
+
       const user: DbUserObject = result.rows[0];
       if (!user) {
-        res.status(404).send('No user with given username/email');
+        res.status(404).json('No user with given username/email');
         return;
       }
+
       if (password !== user.password) {
-        res.status(403).send("Passwords don't match");
+        res.status(403).json("Passwords don't match");
         return;
       }
-      delete user.password;
-      res.send(user);
+
+      const payload = {
+        id: user.id,
+        username: user.username,
+      };
+
+      // Otherwise found user with matching password
+      const token = jwt.sign(
+        payload,
+        process.env.ACCESS_TOKEN_SECRET as string,
+        {
+          expiresIn: process.env.TOKEN_EXPIRATION_TIME,
+        }
+      );
+
+      res.json(token);
     } catch (err) {
       console.log(err);
       res.sendStatus(500);

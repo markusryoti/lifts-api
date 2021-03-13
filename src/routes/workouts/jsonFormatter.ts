@@ -27,15 +27,21 @@ export const workoutSetRowObjectsToWorkouts = (
       set_created_at,
     } = item;
 
-    const workoutData = { workout_name, workout_created_at };
+    const workoutData: any = {
+      workout_id: workoutId,
+      workout_name,
+      workout_created_at,
+    };
     const setData = { set_id, reps, weight, movement_name, set_created_at };
+
+    workoutData['sets'] = setData;
 
     if (workouts[workoutId] === undefined) {
       workouts[workoutId] = workoutData;
       workouts[workoutId]['sets'] = [setData];
     } else {
-      workouts[workoutId]['sets'].push({ setData });
+      workouts[workoutId]['sets'].push(setData);
     }
   });
-  return workouts;
+  return Object.values(workouts);
 };
