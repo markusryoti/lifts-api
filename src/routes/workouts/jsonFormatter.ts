@@ -9,6 +9,21 @@ interface WorkoutJsonItem {
   set_created_at: Date;
 }
 
+interface ISet {
+  set_id: string;
+  reps: number;
+  weight: number;
+  movement_name: string;
+  set_created_at: Date;
+}
+
+interface IWorkoutData {
+  workout_id: string;
+  workout_name: string;
+  workout_created_at: Date;
+  sets: ISet[];
+}
+
 export const workoutSetRowObjectsToWorkouts = (
   json: Array<WorkoutJsonItem>
 ) => {
@@ -27,14 +42,19 @@ export const workoutSetRowObjectsToWorkouts = (
       set_created_at,
     } = item;
 
-    const workoutData: any = {
+    const workoutData: IWorkoutData = {
       workout_id: workoutId,
       workout_name,
       workout_created_at,
+      sets: [],
     };
-    const setData = { set_id, reps, weight, movement_name, set_created_at };
-
-    workoutData['sets'] = setData;
+    const setData: ISet = {
+      set_id,
+      reps,
+      weight,
+      movement_name,
+      set_created_at,
+    };
 
     if (workouts[workoutId] === undefined) {
       workouts[workoutId] = workoutData;
@@ -43,5 +63,11 @@ export const workoutSetRowObjectsToWorkouts = (
       workouts[workoutId]['sets'].push(setData);
     }
   });
-  return Object.values(workouts);
+
+  const sorted = Object.values(workouts).sort(
+    (workout1: any, workout2: any) =>
+      workout2.workout_created_at - workout1.workout_created_at
+  );
+
+  return sorted;
 };
