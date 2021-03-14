@@ -9,6 +9,8 @@ import { DatabaseNewWorkoutResponse, DbWorkoutObject } from './types';
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
 
+  console.log(userId);
+
   try {
     const sql = `
       SELECT
