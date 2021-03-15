@@ -3,8 +3,13 @@ const router = express.Router();
 
 import db from '../../db';
 import auth from '../../middleware/auth';
+import {
+  insertToMovementTable,
+  insertToUserMovementTable,
+  linkSetsToWorkout,
+} from './dbInteractions';
 import { workoutSetRowObjectsToWorkouts } from './jsonFormatter';
-import { DatabaseNewWorkoutResponse, DbWorkoutObject } from './types';
+import { IWorkout } from './types';
 
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
@@ -59,22 +64,6 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
   }
 });
 
-interface ISet {
-  reps: number;
-  weight: number;
-}
-
-interface IMovementSection {
-  name: string;
-  sets: ISet[];
-}
-
-interface IWorkout {
-  name: string;
-  movements: IMovementSection[];
-  createdAt: string;
-}
-
 router.post('/new', auth, async (req: any, res: any) => {
   const userId = req.user.id;
   const workout: IWorkout = req.body;
@@ -91,59 +80,13 @@ router.post('/new', auth, async (req: any, res: any) => {
 
     // Insert to movements table if needed
     const movementNames: string[] = workout.movements.map(item => item.name);
-    const setMovementsSql = `
-      INSERT INTO movements (name)
-      VALUES 
-      ${movementNames.map((_, index) => `($${index + 1})`).join(',\n')}
-      ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
-      RETURNING id;
-      `;
-    const movementUpdate = await db.query(setMovementsSql, movementNames);
-    const movementIds: string[] = movementUpdate.rows.map(obj => obj.id);
+    const movementIds: string[] = await insertToMovementTable(movementNames);
 
     // Update user movements table if needed
-    const addUserMovementIfNotExists = `
-      INSERT INTO user_movements (movement_id, user_id)
-      SELECT $1, $2
-      WHERE
-        NOT EXISTS (
-          SELECT movement_id FROM user_movements
-          WHERE user_id = $2 AND movement_id = $1
-        ) RETURNING id;
-    `;
+    await insertToUserMovementTable(movementIds, userId);
 
-    movementIds.forEach(async movementId => {
-      await db.query(addUserMovementIfNotExists, [movementId, userId]);
-    });
-
-    workout.movements.map(async (movement, index) => {
-      const userMovementSql = `
-      SELECT id from user_movements
-      WHERE movement_id = $1 AND user_id = $2;
-      `;
-      const userMovementResponse = await db.query(userMovementSql, [
-        movementIds[index],
-        userId,
-      ]);
-      const userMovementId = userMovementResponse.rows[0].id;
-
-      movement.sets.forEach(async (set, i) => {
-        const setAddSql = `
-        INSERT INTO sets
-          (reps, weight, user_id, user_movement_id, workout_id)
-        VALUES
-          ($1, $2, $3, $4, $5)
-        `;
-        console.log('addinng');
-        await db.query(setAddSql, [
-          set.reps,
-          set.weight,
-          userId,
-          userMovementId,
-          newWorkoutId,
-        ]);
-      });
-    });
+    // Add workout/movement data to sets
+    await linkSetsToWorkout(workout, movementIds, userId, newWorkoutId);
 
     res.sendStatus(200);
   } catch (error) {

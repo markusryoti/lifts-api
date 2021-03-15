@@ -1,3 +1,5 @@
+import { setServers } from 'dns';
+
 interface WorkoutJsonItem {
   workout_id: string;
   workout_name: string;
@@ -64,10 +66,17 @@ export const workoutSetRowObjectsToWorkouts = (
     }
   });
 
-  const sorted = Object.values(workouts).sort(
+  // Sort workouts
+  const sortedWorkouts = Object.values(workouts).sort(
     (workout1: any, workout2: any) =>
       workout2.workout_created_at - workout1.workout_created_at
   );
 
-  return sorted;
+  // Sort sets in workouts
+  // Now with set ids, maybe change to timestamps
+  sortedWorkouts.forEach((workout: any) => {
+    workout.sets.sort((a: any, b: any) => a.set_id - b.set_id);
+  });
+
+  return sortedWorkouts;
 };

@@ -9,3 +9,19 @@ export interface DbWorkoutObject {
 export interface DatabaseNewWorkoutResponse {
   rows: DbWorkoutObject[];
 }
+
+interface ISet {
+  reps: number;
+  weight: number;
+}
+
+interface IMovementSection {
+  name: string;
+  sets: ISet[];
+}
+
+export interface IWorkout {
+  name: string;
+  movements: IMovementSection[];
+  createdAt: string;
+}
