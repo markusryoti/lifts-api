@@ -1,5 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -20,10 +21,12 @@ const credentialsAreGiven = (
 
 router.post('/', async (req: any, res: any) => {
   const { username, email, password } = req.body;
+
+  console.log(req.body);
   if (credentialsAreGiven(username, email, password)) {
     res
-      .sendStatus(400)
-      .send('Invalid request, must contain username/email and password');
+      .status(400)
+      .json('Invalid request, must contain username/email and password');
   } else {
     let sql;
     let result: DatabaseResponse;
@@ -45,7 +48,7 @@ router.post('/', async (req: any, res: any) => {
         return;
       }
 
-      if (password !== user.password) {
+      if (!bcrypt.compareSync(password, user.password)) {
         res.status(403).json("Passwords don't match");
         return;
       }
