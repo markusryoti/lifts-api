@@ -57,7 +57,25 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
     `;
     const result = await db.query(sql, [userId, workoutId]);
     const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
-    res.send(transformedWorkouts);
+    res.send(transformedWorkouts[0]);
+  } catch (error) {
+    console.log(error.stack);
+    res.sendStatus(500);
+  }
+});
+
+router.delete('/:workoutId', auth, async (req: any, res: any) => {
+  const userId = req.user.id;
+  const { workoutId } = req.params;
+
+  try {
+    const sql = `
+      DELETE FROM workouts
+      WHERE id = $1 AND user_id = $2;
+    `;
+    const result = await db.query(sql, [workoutId, userId]);
+    console.log(result);
+    res.sendStatus(200);
   } catch (error) {
     console.log(error.stack);
     res.sendStatus(500);
