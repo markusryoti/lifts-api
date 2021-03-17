@@ -1,4 +1,5 @@
 import db from '../../db';
+import { ISet } from './jsonFormatter';
 import { IWorkout } from './types';
 
 export const insertToMovementTable = async (
@@ -65,6 +66,49 @@ export const linkSetsToWorkout = async (
         userId,
         userMovementId,
         newWorkoutId,
+      ]);
+    }
+  }
+};
+
+export const updateWorkoutSets = async (
+  sets: ISet[],
+  userId: string,
+  workoutId: string,
+  updatedMovementNames: any
+) => {
+  for (const set of sets) {
+    if (!updatedMovementNames[set.movement_name]) {
+      const sqlWithNoMovementChanges = `
+      UPDATE sets
+      SET
+        reps = $1,
+        weight = $2,
+        updated_at = current_timestamp
+      WHERE user_id = $3 AND workout_id = $5
+      `;
+      await db.query(sqlWithNoMovementChanges, [
+        set.reps.toString(),
+        set.weight.toString(),
+        userId,
+        workoutId,
+      ]);
+    } else {
+      const sqlWithMovementChanges = `
+      UPDATE sets
+      SET
+        reps = $1,
+        weight = $2,
+        user_movement_id = $3,
+        updated_at = current_timestamp
+      WHERE user_id = $4 AND workout_id = $5
+      `;
+      await db.query(sqlWithMovementChanges, [
+        set.reps.toString(),
+        set.weight.toString(),
+        updatedMovementNames[set.movement_name],
+        userId,
+        workoutId,
       ]);
     }
   }

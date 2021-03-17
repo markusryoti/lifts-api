@@ -1,5 +1,3 @@
-import { setServers } from 'dns';
-
 interface WorkoutJsonItem {
   workout_id: string;
   workout_name: string;
@@ -11,7 +9,7 @@ interface WorkoutJsonItem {
   set_created_at: Date;
 }
 
-interface ISet {
+export interface ISet {
   set_id: string;
   reps: number;
   weight: number;
@@ -19,7 +17,7 @@ interface ISet {
   set_created_at: Date;
 }
 
-interface IWorkoutData {
+export interface IWorkoutOut {
   workout_id: string;
   workout_name: string;
   workout_created_at: Date;
@@ -44,7 +42,7 @@ export const workoutSetRowObjectsToWorkouts = (
       set_created_at,
     } = item;
 
-    const workoutData: IWorkoutData = {
+    const workoutData: IWorkoutOut = {
       workout_id: workoutId,
       workout_name,
       workout_created_at,
