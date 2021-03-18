@@ -97,13 +97,10 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
     const movementNames = editedWorkout.sets.map(set => set.movement_name);
     const uniqueNames = [...new Set(movementNames)];
 
-    const updatedMovementNames: any = {};
-
+    const movementIds: any = {};
     for (const name of uniqueNames) {
       const sqlSeeIfExists = `
         SELECT * FROM movements
-        LEFT JOIN user_movements
-        ON movements.id = user_movements.movement_id
         WHERE name = $1
       `;
       const result = await db.query(sqlSeeIfExists, [name]);
@@ -119,20 +116,22 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
           return;
         }
         movementId = newMovement.id.toString();
-
-        const userMovementResponse = await addMovementToUserMovementTable(
-          movementId,
-          userId
-        );
-
-        userMovementId = userMovementResponse?.id;
-
-        if (!userMovementId) {
-          res.sendStatus(500);
-          return;
-        }
-      } else if (row.user_id === null) {
+      } else {
         movementId = row.id;
+      }
+
+      // See if exists with current user
+      const sqlSeeIfExistsInUserMovements = `
+        SELECT * FROM user_movements
+        WHERE movement_id = $1 AND user_id = $2
+      `;
+      const userResult = await db.query(sqlSeeIfExistsInUserMovements, [
+        movementId,
+        userId,
+      ]);
+      const userMovementRow = userResult.rows[0];
+
+      if (!userMovementRow) {
         const userMovementResponse = await addMovementToUserMovementTable(
           movementId,
           userId
@@ -145,19 +144,13 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
           return;
         }
       } else {
+        userMovementId = userMovementRow.id;
       }
 
-      if (!row || name !== row.name) {
-        updatedMovementNames[name] = userMovementId;
-      }
+      movementIds[name] = userMovementId;
     }
 
-    await updateWorkoutSets(
-      editedWorkout.sets,
-      userId,
-      workoutId,
-      updatedMovementNames
-    );
+    await updateWorkoutSets(editedWorkout.sets, userId, workoutId, movementIds);
 
     res.sendStatus(200);
   } catch (error) {
