@@ -5,6 +5,8 @@ interface WorkoutJsonItem {
   set_id: string;
   reps: number;
   weight: number;
+  user_movement_id: string;
+  movement_id: string;
   movement_name: string;
   set_created_at: Date;
 }
@@ -13,6 +15,8 @@ export interface ISet {
   set_id: string;
   reps: number;
   weight: number;
+  user_movement_id: string;
+  movement_id: string;
   movement_name: string;
   set_created_at: Date;
 }
@@ -38,6 +42,8 @@ export const workoutSetRowObjectsToWorkouts = (
       set_id,
       reps,
       weight,
+      user_movement_id,
+      movement_id,
       movement_name,
       set_created_at,
     } = item;
@@ -52,6 +58,8 @@ export const workoutSetRowObjectsToWorkouts = (
       set_id,
       reps,
       weight,
+      user_movement_id,
+      movement_id,
       movement_name,
       set_created_at,
     };

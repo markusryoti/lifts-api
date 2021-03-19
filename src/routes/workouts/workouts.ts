@@ -24,7 +24,9 @@ router.get('/', auth, async (req: any, res: any) => {
       SELECT
         sets.id AS set_id, reps, weight, workouts.id AS workout_id,
         workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, sets.created_at AS set_created_at
+        movements.name AS movement_name, movements.id AS movement_id,
+        user_movements.id AS user_movement_id,
+        sets.created_at AS set_created_at
       FROM sets
       JOIN users ON sets.user_id = users.id
       JOIN workouts ON sets.workout_id = workouts.id
@@ -51,7 +53,9 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
       SELECT
         sets.id AS set_id, reps, weight, workouts.id AS workout_id,
         workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, sets.created_at AS set_created_at
+        movements.name AS movement_name, movements.id AS movement_id,
+        user_movements.id AS user_movement_id,
+        sets.created_at AS set_created_at      
       FROM sets
       JOIN users ON sets.user_id = users.id
       JOIN workouts ON sets.workout_id = workouts.id
@@ -182,6 +186,58 @@ router.delete('/:workoutId', auth, async (req: any, res: any) => {
   }
 });
 
+router.delete(
+  '/:workoutId/sets/movement/:movementNameToDelete',
+  auth,
+  async (req: any, res: any) => {
+    const userId = req.user.id;
+    const { workoutId, movementNameToDelete } = req.params;
+
+    try {
+      const sqlForUserMovementId = `
+        SELECT * FROM user_movements
+        JOIN movements
+        ON user_movements.movement_id = movements.id
+        WHERE movements.name = $1 AND user_movements.user_id = $2
+      `;
+
+      const userMovementIdQueryResult = await db.query(sqlForUserMovementId, [
+        decodeURI(movementNameToDelete),
+        userId,
+      ]);
+
+      const userMovementId = userMovementIdQueryResult.rows[0].movement_id;
+
+      if (!userMovementId) {
+        res.sendStatus(500);
+        return;
+      }
+
+      const sqlToDelete = `
+      DELETE FROM sets
+      WHERE workout_id = $1 AND user_id = $2
+      AND user_movement_id = $3;
+    `;
+      const result = await db.query(sqlToDelete, [
+        workoutId,
+        userId,
+        userMovementId,
+      ]);
+
+      // Something went wrong
+      if (result.rowCount === 0) {
+        res.sendStatus(500);
+        return;
+      }
+
+      res.sendStatus(200);
+    } catch (error) {
+      console.log(error.stack);
+      res.sendStatus(500);
+    }
+  }
+);
+
 router.post('/new', auth, async (req: any, res: any) => {
   const userId = req.user.id;
   const workout: IWorkout = req.body;
@@ -213,7 +269,7 @@ router.post('/new', auth, async (req: any, res: any) => {
   }
 });
 
-router.post('/:workoutId/sets/', async (req: any, res: any) => {
+router.post('/:workoutId/sets/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
 
   const { workoutId } = req.params;
@@ -248,6 +304,34 @@ router.post('/:workoutId/sets/', async (req: any, res: any) => {
     return;
   }
 });
+
+router.delete(
+  '/:workoutId/sets/set/:setId',
+  auth,
+  async (req: any, res: any) => {
+    const userId = req.user.id;
+    const { setId } = req.params;
+
+    try {
+      const sql = `
+      DELETE FROM sets
+      WHERE id = $1 AND user_id = $2;
+    `;
+      const result = await db.query(sql, [setId, userId]);
+
+      // Something went wrong
+      if (result.rowCount === 0) {
+        res.sendStatus(500);
+        return;
+      }
+      res.sendStatus(200);
+    } catch (error) {
+      console.log(error.stack);
+      res.sendStatus(500);
+      return;
+    }
+  }
+);
 
 const inputsAreValid = (
   reps: number,
