@@ -6,37 +6,24 @@ import auth from '../../middleware/auth';
 import {
   addMovementToMovementTable,
   addMovementToUserMovementTable,
-} from '../movements/dbInteractions';
+} from '../repository/movements';
 import {
+  getUserTransformedWorkoutById,
+  getUserTransformedWorkouts,
   insertToMovementTable,
   insertToUserMovementTable,
+  IWorkout,
   linkSetsToWorkout,
   updateWorkoutSets,
-} from './dbInteractions';
-import { IWorkoutOut, workoutSetRowObjectsToWorkouts } from './jsonFormatter';
-import { IWorkout } from './types';
+} from '../repository/workouts';
+
+import { IWorkoutOut } from '../repository/json';
 
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
 
   try {
-    const sql = `
-      SELECT
-        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
-        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, movements.id AS movement_id,
-        user_movements.id AS user_movement_id,
-        sets.created_at AS set_created_at
-      FROM sets
-      JOIN users ON sets.user_id = users.id
-      JOIN workouts ON sets.workout_id = workouts.id
-      JOIN user_movements ON user_movements.id = sets.user_movement_id
-      JOIN movements ON user_movements.movement_id = movements.id
-      WHERE users.id = $1 
-      ORDER BY workouts.created_at DESC;
-    `;
-    const result = await db.query(sql, [userId]);
-    const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
+    const transformedWorkouts = await getUserTransformedWorkouts(userId);
     res.send(transformedWorkouts);
   } catch (error) {
     console.log(error.stack);
@@ -49,24 +36,11 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
   const { workoutId } = req.params;
 
   try {
-    const sql = `
-      SELECT
-        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
-        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, movements.id AS movement_id,
-        user_movements.id AS user_movement_id,
-        sets.created_at AS set_created_at      
-      FROM sets
-      JOIN users ON sets.user_id = users.id
-      JOIN workouts ON sets.workout_id = workouts.id
-      JOIN user_movements ON user_movements.id = sets.user_movement_id
-      JOIN movements ON user_movements.movement_id = movements.id
-      WHERE users.id = $1 AND sets.workout_id = $2
-      ORDER BY workouts.created_at DESC;
-    `;
-    const result = await db.query(sql, [userId, workoutId]);
-    const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
-    res.send(transformedWorkouts[0]);
+    const transformedWorkoutById = await getUserTransformedWorkoutById(
+      userId,
+      workoutId
+    );
+    res.send(transformedWorkoutById);
   } catch (error) {
     console.log(error.stack);
     res.sendStatus(500);
