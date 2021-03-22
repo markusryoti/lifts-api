@@ -7,20 +7,11 @@ dotenv.config();
 
 const router = express.Router();
 
-import db from '../../db';
-
-interface DbUserObject {
-  id: string;
-  username: string;
-  email: string;
-  password?: string;
-  created_at: Date;
-  updated_at: Date;
-}
-
-interface DatabaseResponse {
-  rows: DbUserObject[];
-}
+import {
+  createNewUser,
+  DbUser,
+  getUserWithUsernameOrEmail,
+} from '../repository/users';
 
 router.post('/', async (req: any, res: any) => {
   const { username, email, password } = req.body;
@@ -31,25 +22,34 @@ router.post('/', async (req: any, res: any) => {
     return;
   }
 
-  // TODO
-  // Check if exists
-
   try {
+    const existingUser = await getUserWithUsernameOrEmail('email', email);
+    console.log(existingUser);
+
+    if (existingUser) {
+      res.status(403).json('User with email already exists');
+      return;
+    }
+
     const hashedPassword = bcrypt.hashSync(
       password,
       parseInt(process.env.SALT_ROUNDS as string)
     );
 
-    const sql =
-      'INSERT INTO users(username, email, password) VALUES($1, $2, $3) RETURNING *';
-    const values = [username, email, hashedPassword];
+    const newUser: DbUser | null = await createNewUser(
+      username,
+      email,
+      hashedPassword
+    );
 
-    const result: DatabaseResponse = await db.query(sql, values);
-    const user: DbUserObject = result.rows[0];
+    if (!newUser) {
+      res.status(500).json('Error occured while creating a new user');
+      return;
+    }
 
     const payload = {
-      id: user.id,
-      username: user.username,
+      id: newUser.id,
+      username: newUser.username,
     };
 
     const token = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET as string, {

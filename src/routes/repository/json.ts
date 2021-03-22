@@ -84,5 +84,29 @@ export const workoutSetRowObjectsToWorkouts = (
     workout.sets.sort((a: any, b: any) => a.set_id - b.set_id);
   });
 
-  return sortedWorkouts;
+  // Transform that sets are listed under a movement name
+  const transformed = sortedWorkouts.map((workout: any): any => {
+    const movements: any = {};
+    const sets = workout.sets;
+
+    sets.forEach((set: ISet) => {
+      if (movements[set.movement_name] === undefined) {
+        movements[set.movement_name] = [set];
+      } else {
+        movements[set.movement_name].push(set);
+      }
+    });
+
+    return {
+      ...workout,
+      movements: movements,
+    };
+  });
+
+  // No need for sets anymore
+  transformed.forEach((workout: any) => {
+    delete workout.sets;
+  });
+
+  return transformed;
 };

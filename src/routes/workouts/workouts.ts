@@ -1,42 +1,37 @@
 import express from 'express';
 const router = express.Router();
 
-import db from '../../db';
 import auth from '../../middleware/auth';
 import {
   addMovementToMovementTable,
   addMovementToUserMovementTable,
-} from '../movements/dbInteractions';
+  checkByNameIfMovementInUserMovements,
+  getUserMovementIdByMovementName,
+  seeIfMovementInMovementTable,
+} from '../repository/movements';
 import {
+  createNewSet,
+  createNewWorkout,
+  deleteMovementFromWorkout,
+  deleteSetByIdAndUserId,
+  deleteWorkoutById,
+  getUserTransformedWorkoutById,
+  getUserTransformedWorkouts,
   insertToMovementTable,
   insertToUserMovementTable,
+  IWorkout,
   linkSetsToWorkout,
+  updateWorkoutName,
   updateWorkoutSets,
-} from './dbInteractions';
-import { IWorkoutOut, workoutSetRowObjectsToWorkouts } from './jsonFormatter';
-import { IWorkout } from './types';
+} from '../repository/workouts';
+
+import { IWorkoutOut } from '../repository/json';
 
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
 
   try {
-    const sql = `
-      SELECT
-        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
-        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, movements.id AS movement_id,
-        user_movements.id AS user_movement_id,
-        sets.created_at AS set_created_at
-      FROM sets
-      JOIN users ON sets.user_id = users.id
-      JOIN workouts ON sets.workout_id = workouts.id
-      JOIN user_movements ON user_movements.id = sets.user_movement_id
-      JOIN movements ON user_movements.movement_id = movements.id
-      WHERE users.id = $1 
-      ORDER BY workouts.created_at DESC;
-    `;
-    const result = await db.query(sql, [userId]);
-    const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
+    const transformedWorkouts = await getUserTransformedWorkouts(userId);
     res.send(transformedWorkouts);
   } catch (error) {
     console.log(error.stack);
@@ -49,24 +44,11 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
   const { workoutId } = req.params;
 
   try {
-    const sql = `
-      SELECT
-        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
-        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, movements.id AS movement_id,
-        user_movements.id AS user_movement_id,
-        sets.created_at AS set_created_at      
-      FROM sets
-      JOIN users ON sets.user_id = users.id
-      JOIN workouts ON sets.workout_id = workouts.id
-      JOIN user_movements ON user_movements.id = sets.user_movement_id
-      JOIN movements ON user_movements.movement_id = movements.id
-      WHERE users.id = $1 AND sets.workout_id = $2
-      ORDER BY workouts.created_at DESC;
-    `;
-    const result = await db.query(sql, [userId, workoutId]);
-    const transformedWorkouts = workoutSetRowObjectsToWorkouts(result.rows);
-    res.send(transformedWorkouts[0]);
+    const transformedWorkoutById = await getUserTransformedWorkoutById(
+      userId,
+      workoutId
+    );
+    res.send(transformedWorkoutById);
   } catch (error) {
     console.log(error.stack);
     res.sendStatus(500);
@@ -77,23 +59,12 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
   const userId = req.user.id;
   const { workoutId } = req.params;
   const editedWorkout: IWorkoutOut = req.body;
-  console.log(editedWorkout);
 
   try {
     const workoutName = editedWorkout.workout_name;
-    const workoutNameUpdateSql = `
-    UPDATE workouts
-    SET name = $1, updated_at = current_timestamp
-    WHERE id = $2;
-  `;
 
-    const nameUpdateResult = await db.query(workoutNameUpdateSql, [
-      workoutName,
-      workoutId,
-    ]);
-
-    // Something went wrong
-    if (nameUpdateResult.rowCount === 0) {
+    const nameUpdateResult = await updateWorkoutName(workoutName, workoutId);
+    if (!nameUpdateResult) {
       res.sendStatus(500);
       return;
     }
@@ -103,17 +74,12 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
 
     const movementIds: any = {};
     for (const name of uniqueNames) {
-      const sqlSeeIfExists = `
-        SELECT * FROM movements
-        WHERE name = $1
-      `;
-      const result = await db.query(sqlSeeIfExists, [name]);
-      const row = result.rows[0];
+      const movementRow = await seeIfMovementInMovementTable(name);
 
       let movementId: string = '';
       let userMovementId;
 
-      if (!row) {
+      if (!movementRow) {
         const newMovement = await addMovementToMovementTable(name);
         if (!newMovement) {
           res.sendStatus(500);
@@ -121,36 +87,25 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
         }
         movementId = newMovement.id.toString();
       } else {
-        movementId = row.id;
+        movementId = movementRow.id.toString();
       }
 
       // See if exists with current user
-      const sqlSeeIfExistsInUserMovements = `
-        SELECT * FROM user_movements
-        WHERE movement_id = $1 AND user_id = $2
-      `;
-      const userResult = await db.query(sqlSeeIfExistsInUserMovements, [
-        movementId,
-        userId,
-      ]);
-      const userMovementRow = userResult.rows[0];
-
+      const userMovementRow = await checkByNameIfMovementInUserMovements(name);
       if (!userMovementRow) {
         const userMovementResponse = await addMovementToUserMovementTable(
           movementId,
           userId
         );
 
-        userMovementId = userMovementResponse?.id;
-
-        if (!userMovementId) {
+        if (!userMovementResponse) {
           res.sendStatus(500);
           return;
         }
+        userMovementId = userMovementResponse.id;
       } else {
-        userMovementId = userMovementRow.id;
+        userMovementId = userMovementRow.user_movement_id;
       }
-
       movementIds[name] = userMovementId;
     }
 
@@ -168,17 +123,11 @@ router.delete('/:workoutId', auth, async (req: any, res: any) => {
   const { workoutId } = req.params;
 
   try {
-    const sql = `
-      DELETE FROM workouts
-      WHERE id = $1 AND user_id = $2;
-    `;
-    const result = await db.query(sql, [workoutId, userId]);
-
-    // Something went wrong
-    if (result.rowCount === 0) {
+    const success = await deleteWorkoutById(workoutId, userId);
+    if (!success) {
       res.sendStatus(500);
+      return;
     }
-
     res.sendStatus(200);
   } catch (error) {
     console.log(error.stack);
@@ -194,38 +143,21 @@ router.delete(
     const { workoutId, movementNameToDelete } = req.params;
 
     try {
-      const sqlForUserMovementId = `
-        SELECT * FROM user_movements
-        JOIN movements
-        ON user_movements.movement_id = movements.id
-        WHERE movements.name = $1 AND user_movements.user_id = $2
-      `;
-
-      const userMovementIdQueryResult = await db.query(sqlForUserMovementId, [
+      const userMovementId = await getUserMovementIdByMovementName(
         decodeURI(movementNameToDelete),
-        userId,
-      ]);
-
-      const userMovementId = userMovementIdQueryResult.rows[0].movement_id;
-
+        userId
+      );
       if (!userMovementId) {
         res.sendStatus(500);
         return;
       }
 
-      const sqlToDelete = `
-      DELETE FROM sets
-      WHERE workout_id = $1 AND user_id = $2
-      AND user_movement_id = $3;
-    `;
-      const result = await db.query(sqlToDelete, [
+      const deleteSuccess = await deleteMovementFromWorkout(
         workoutId,
         userId,
-        userMovementId,
-      ]);
-
-      // Something went wrong
-      if (result.rowCount === 0) {
+        userMovementId
+      );
+      if (!deleteSuccess) {
         res.sendStatus(500);
         return;
       }
@@ -243,14 +175,12 @@ router.post('/new', auth, async (req: any, res: any) => {
   const workout: IWorkout = req.body;
 
   try {
-    // First add a new workout
-    const newWorkoutSql =
-      'INSERT INTO workouts (user_id, name) VALUES ($1, $2) RETURNING id';
-    const newWorkoutResult = await db.query(newWorkoutSql, [
-      userId,
-      workout.name,
-    ]);
-    const newWorkoutId: number = newWorkoutResult.rows[0].id;
+    // Create a new workout
+    const newWorkoutId = await createNewWorkout(userId, workout.name);
+    if (!newWorkoutId) {
+      res.sendStatus(500);
+      return;
+    }
 
     // Insert to movements table if needed
     const movementNames: string[] = workout.movements.map(item => item.name);
@@ -275,6 +205,20 @@ router.post('/:workoutId/sets/', auth, async (req: any, res: any) => {
   const { workoutId } = req.params;
   const { reps, weight, userMovementId } = req.body;
 
+  const inputsAreValid = (
+    reps: number,
+    userId: number,
+    userMovementId: number
+  ): boolean => {
+    if (
+      reps === undefined ||
+      userId === undefined ||
+      userMovementId === undefined
+    )
+      return false;
+    return true;
+  };
+
   try {
     if (!inputsAreValid(reps, userId, userMovementId)) {
       res
@@ -283,15 +227,15 @@ router.post('/:workoutId/sets/', auth, async (req: any, res: any) => {
       return;
     }
 
-    const weightToAdd = weight === undefined ? null : weight;
-    const sqlAdd = `
-    INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id)
-    VALUES ($1, $2, $3, $4, $5) RETURNING *`;
-    const values = [reps, weightToAdd, userId, userMovementId, workoutId];
+    const weightToAdd = weight === undefined ? '' : weight;
 
-    const result = await db.query(sqlAdd, values);
-    const addedSet = result.rows[0];
-
+    const addedSet = await createNewSet(
+      reps,
+      weightToAdd,
+      userId,
+      userMovementId,
+      workoutId
+    );
     if (!addedSet) {
       res.sendStatus(500);
       return;
@@ -313,14 +257,8 @@ router.delete(
     const { setId } = req.params;
 
     try {
-      const sql = `
-      DELETE FROM sets
-      WHERE id = $1 AND user_id = $2;
-    `;
-      const result = await db.query(sql, [setId, userId]);
-
-      // Something went wrong
-      if (result.rowCount === 0) {
+      const deleteSuccess = await deleteSetByIdAndUserId(setId, userId);
+      if (!deleteSuccess) {
         res.sendStatus(500);
         return;
       }
@@ -332,19 +270,5 @@ router.delete(
     }
   }
 );
-
-const inputsAreValid = (
-  reps: number,
-  userId: number,
-  userMovementId: number
-): boolean => {
-  if (
-    reps === undefined ||
-    userId === undefined ||
-    userMovementId === undefined
-  )
-    return false;
-  return true;
-};
 
 export default router;

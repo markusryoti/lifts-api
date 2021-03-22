@@ -1,34 +1,25 @@
 import express from 'express';
 const router = express.Router();
 
-import db from '../../db';
 import auth from '../../middleware/auth';
-
-interface DbUserObject {
-  id: number;
-  username: string;
-  email: string;
-  password?: string;
-  created_at: Date;
-  updated_at: Date;
-}
-
-interface DatabaseResponse {
-  rows: DbUserObject[];
-}
+import { DbUser, getUserWithUsernameOrEmail } from '../repository/users';
 
 router.get('/', auth, async (req: any, res: any) => {
-  const userId = req.user.id;
-  const sql = 'SELECT * FROM users WHERE users.id = $1';
+  const reqUser = req.user;
+
   try {
-    const result: DatabaseResponse = await db.query(sql, [userId]);
-    const user: DbUserObject = result.rows[0];
-    if (user) {
-      delete user.password;
-      res.send(user);
-      return;
+    const user: DbUser | null = await getUserWithUsernameOrEmail(
+      'username',
+      reqUser.username
+    );
+
+    if (!user) {
+      res.status(404).json('No user exists with given username');
     }
-    res.status(404).json('No user found with given id');
+
+    delete user?.password;
+
+    res.send(user);
   } catch (error) {
     console.log(error.stack);
     res.sendStatus(500);

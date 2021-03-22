@@ -1,13 +1,12 @@
 import express from 'express';
-const router = express.Router();
-
 import {
   seeIfMovementInMovementTable,
   addMovementToMovementTable,
   seeIfMovementInUserMovementTable,
   addMovementToUserMovementTable,
   joinMovementAndUserMovementTables,
-} from './dbInteractions';
+} from '../repository/movements';
+const router = express.Router();
 
 router.post('/new', async (req: any, res: any) => {
   const { userId, name } = req.body;
