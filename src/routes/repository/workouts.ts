@@ -82,7 +82,7 @@ export const linkSetsToWorkout = async (
   workout: IWorkout,
   movementIds: string[],
   userId: string,
-  newWorkoutId: number
+  newWorkoutId: string
 ) => {
   for (const [index, movement] of workout.movements.entries()) {
     const userMovementSql = `
@@ -193,4 +193,97 @@ export const getUserTransformedWorkoutById = async (
     return transformedWorkouts[0];
   }
   return null;
+};
+
+export const updateWorkoutName = async (
+  newName: string,
+  newId: string
+): Promise<boolean> => {
+  const sql = `
+    UPDATE workouts
+    SET name = $1, updated_at = current_timestamp
+    WHERE id = $2;
+  `;
+  const nameUpdateResult = await db.query(sql, [newName, newId]);
+  if (nameUpdateResult.rowCount === 0) return false;
+  return true;
+};
+
+export const deleteWorkoutById = async (
+  id: string,
+  userId: string
+): Promise<boolean> => {
+  const sql = `
+      DELETE FROM workouts
+      WHERE id = $1 AND user_id = $2;
+    `;
+  const result = await db.query(sql, [id, userId]);
+  if (result.rowCount === 0) {
+    return false;
+  }
+  return true;
+};
+
+export const deleteMovementFromWorkout = async (
+  workoutId: string,
+  userId: string,
+  userMovementId: string
+): Promise<boolean> => {
+  const sql = `
+      DELETE FROM sets
+      WHERE workout_id = $1 AND user_id = $2
+      AND user_movement_id = $3;
+    `;
+  const result = await db.query(sql, [workoutId, userId, userMovementId]);
+  if (result.rowCount === 0) {
+    return false;
+  }
+  return true;
+};
+
+export const deleteSetByIdAndUserId = async (
+  setId: string,
+  userId: string
+): Promise<boolean> => {
+  const sql = `
+      DELETE FROM sets
+      WHERE id = $1 AND user_id = $2;
+    `;
+  const result = await db.query(sql, [setId, userId]);
+  if (result.rowCount === 0) {
+    return false;
+  }
+  return true;
+};
+
+export const createNewWorkout = async (
+  userId: string,
+  name: string
+): Promise<string | null> => {
+  const sql =
+    'INSERT INTO workouts (user_id, name) VALUES ($1, $2) RETURNING id';
+  const newWorkoutResult = await db.query(sql, [userId, name]);
+  const newWorkoutId = newWorkoutResult.rows[0].id;
+  if (!newWorkoutId) {
+    return null;
+  }
+  return newWorkoutId;
+};
+
+export const createNewSet = async (
+  reps: string,
+  weightToAdd: string,
+  userId: string,
+  userMovementId: string,
+  workoutId: string
+): Promise<any> => {
+  const sql = `
+    INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id)
+    VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+  const values = [reps, weightToAdd, userId, userMovementId, workoutId];
+  const result = await db.query(sql, values);
+  const addedSet = result.rows[0];
+
+  if (!addedSet) return null;
+  return addedSet;
 };

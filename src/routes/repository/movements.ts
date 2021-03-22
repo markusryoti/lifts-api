@@ -72,6 +72,21 @@ export const seeIfMovementInUserMovementTable = async (
   return null;
 };
 
+export const checkByNameIfMovementInUserMovements = async (name: string) => {
+  const sql = `
+    SELECT id AS user_movement_id, movement_id, user_id
+    FROM user_movements
+    JOIN movements
+    ON movements.id = user_movements.movement_id
+    WHERE movements.name = $1`;
+  const userMovementExistsResult = await db.query(sql, [name]);
+  const userMovement = userMovementExistsResult.rows[0];
+  if (userMovement) {
+    return userMovement;
+  }
+  return null;
+};
+
 export const addMovementToUserMovementTable = async (
   movementId: string,
   userId: string
@@ -106,4 +121,22 @@ export const joinMovementAndUserMovementTables = async (
     return userMovement;
   }
   return null;
+};
+
+export const getUserMovementIdByMovementName = async (
+  movementName: string,
+  userId: string
+): Promise<string | null> => {
+  const sql = `
+        SELECT * FROM user_movements
+        JOIN movements
+        ON user_movements.movement_id = movements.id
+        WHERE movements.name = $1 AND user_movements.user_id = $2
+      `;
+
+  const userMovementIdQueryResult = await db.query(sql, [movementName, userId]);
+  const userMovementId = userMovementIdQueryResult.rows[0].id;
+
+  if (!userMovementId) return null;
+  return userMovementId;
 };

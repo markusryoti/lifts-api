@@ -33,7 +33,7 @@ export const getUserWithUsernameOrEmail = async (
       sql = 'SELECT * FROM users WHERE email = $1';
       result = await db.query(sql, [loginValue]);
     }
-    const user = result.rows[0];
+    const user: DbUser = result.rows[0];
     if (user) {
       return user;
     }

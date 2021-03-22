@@ -4,22 +4,17 @@ const router = express.Router();
 import auth from '../../middleware/auth';
 import { DbUser, getUserWithUsernameOrEmail } from '../repository/users';
 
-router.get('/:username', auth, async (req: any, res: any) => {
-  const userId = req.user.id;
-  const { username } = req.params;
+router.get('/', auth, async (req: any, res: any) => {
+  const reqUser = req.user;
 
   try {
     const user: DbUser | null = await getUserWithUsernameOrEmail(
       'username',
-      username
+      reqUser.username
     );
 
     if (!user) {
       res.status(404).json('No user exists with given username');
-    }
-
-    if (user?.id !== userId) {
-      res.status(401).json('Unauthorized to view other users data');
     }
 
     delete user?.password;
