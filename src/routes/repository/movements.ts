@@ -74,7 +74,7 @@ export const seeIfMovementInUserMovementTable = async (
 
 export const checkByNameIfMovementInUserMovements = async (name: string) => {
   const sql = `
-    SELECT id AS user_movement_id, movement_id, user_id
+    SELECT user_movements.id AS user_movement_id, movement_id, user_id
     FROM user_movements
     JOIN movements
     ON movements.id = user_movements.movement_id

@@ -25,7 +25,7 @@ import {
   updateWorkoutSets,
 } from '../repository/workouts';
 
-import { IWorkoutOut } from '../repository/json';
+import { IWorkoutOutputJSON, transformToRowObjects } from '../repository/json';
 
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
@@ -58,7 +58,7 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
 router.put('/:workoutId', auth, async (req: any, res: any) => {
   const userId = req.user.id;
   const { workoutId } = req.params;
-  const editedWorkout: IWorkoutOut = req.body;
+  const editedWorkout: IWorkoutOutputJSON = req.body;
 
   try {
     const workoutName = editedWorkout.workout_name;
@@ -69,7 +69,7 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       return;
     }
 
-    const movementNames = editedWorkout.sets.map(set => set.movement_name);
+    const movementNames = Object.keys(editedWorkout.movements);
     const uniqueNames = [...new Set(movementNames)];
 
     const movementIds: any = {};
@@ -109,7 +109,9 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       movementIds[name] = userMovementId;
     }
 
-    await updateWorkoutSets(editedWorkout.sets, userId, workoutId, movementIds);
+    const sets = transformToRowObjects(editedWorkout.movements);
+
+    await updateWorkoutSets(sets, userId, workoutId, movementIds);
 
     res.sendStatus(200);
   } catch (error) {

@@ -28,6 +28,17 @@ export interface IWorkoutOut {
   sets: ISet[];
 }
 
+export interface IWorkoutMovements {
+  [name: string]: Array<ISet>;
+}
+
+export interface IWorkoutOutputJSON {
+  workout_id: string;
+  workout_name: string;
+  workout_created_at: string;
+  movements: IWorkoutMovements;
+}
+
 export const workoutSetRowObjectsToWorkouts = (
   json: Array<WorkoutJsonItem>
 ) => {
@@ -85,23 +96,25 @@ export const workoutSetRowObjectsToWorkouts = (
   });
 
   // Transform that sets are listed under a movement name
-  const transformed = sortedWorkouts.map((workout: any): any => {
-    const movements: any = {};
-    const sets = workout.sets;
+  const transformed: Array<IWorkoutOutputJSON> = sortedWorkouts.map(
+    (workout: any): any => {
+      const movements: any = {};
+      const sets = workout.sets;
 
-    sets.forEach((set: ISet) => {
-      if (movements[set.movement_name] === undefined) {
-        movements[set.movement_name] = [set];
-      } else {
-        movements[set.movement_name].push(set);
-      }
-    });
+      sets.forEach((set: ISet) => {
+        if (movements[set.movement_name] === undefined) {
+          movements[set.movement_name] = [set];
+        } else {
+          movements[set.movement_name].push(set);
+        }
+      });
 
-    return {
-      ...workout,
-      movements: movements,
-    };
-  });
+      return {
+        ...workout,
+        movements: movements,
+      };
+    }
+  );
 
   // No need for sets anymore
   transformed.forEach((workout: any) => {
@@ -109,4 +122,14 @@ export const workoutSetRowObjectsToWorkouts = (
   });
 
   return transformed;
+};
+
+export const transformToRowObjects = (
+  workoutMovements: IWorkoutMovements
+): Array<ISet> => {
+  const listOfSets: Array<Array<ISet>> = Object.values(workoutMovements);
+  return listOfSets.reduce((acc: Array<ISet>, current: Array<ISet>) => [
+    ...acc,
+    ...current,
+  ]);
 };
