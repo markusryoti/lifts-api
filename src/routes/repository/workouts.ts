@@ -186,10 +186,10 @@ export const getUserTransformedWorkoutById = async (
       ORDER BY workouts.created_at DESC;
     `;
   const result = await db.query(sql, [userId, workoutId]);
-  const workoutSet: DbWorkoutSet | undefined = result.rows[0];
+  const workoutSet: Array<DbWorkoutSet> | undefined = result.rows;
 
   if (workoutSet) {
-    const transformedWorkouts = workoutSetRowObjectsToWorkouts([workoutSet]);
+    const transformedWorkouts = workoutSetRowObjectsToWorkouts(workoutSet);
     return transformedWorkouts[0];
   }
   return null;
