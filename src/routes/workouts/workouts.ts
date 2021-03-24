@@ -69,7 +69,9 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       return;
     }
 
-    const movementNames = Object.keys(editedWorkout.movements);
+    const sets = transformToRowObjects(editedWorkout.movements);
+
+    const movementNames = sets.map(set => set.movement_name);
     const uniqueNames = [...new Set(movementNames)];
 
     const movementIds: any = {};
@@ -108,8 +110,6 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       }
       movementIds[name] = userMovementId;
     }
-
-    const sets = transformToRowObjects(editedWorkout.movements);
 
     await updateWorkoutSets(sets, userId, workoutId, movementIds);
 

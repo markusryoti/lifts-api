@@ -49,6 +49,7 @@ export const addMovementToMovementTable = async (
     sqlAddToMovements,
     [name]
   );
+
   const movement = movementAddResult.rows[0];
   if (movement) {
     return movement;
