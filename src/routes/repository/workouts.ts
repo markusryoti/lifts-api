@@ -279,7 +279,9 @@ export const createNewSet = async (
 ): Promise<any> => {
   const sql = `
     INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id)
-    VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id AS set_id, reps, weight, user_movement_id,
+    created_at AS set_created_at`;
   const values = [reps, weightToAdd, userId, userMovementId, workoutId];
   const result = await db.query(sql, values);
   const addedSet = result.rows[0];
