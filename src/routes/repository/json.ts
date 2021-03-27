@@ -21,22 +21,11 @@ export interface ISet {
   set_created_at: Date;
 }
 
-export interface IWorkoutOut {
+export interface IWorkout {
   workout_id: string;
   workout_name: string;
   workout_created_at: Date;
   sets: ISet[];
-}
-
-export interface IWorkoutMovements {
-  [name: string]: Array<ISet>;
-}
-
-export interface IWorkoutOutputJSON {
-  workout_id: string;
-  workout_name: string;
-  workout_created_at: string;
-  movements: IWorkoutMovements;
 }
 
 export const workoutSetRowObjectsToWorkouts = (
@@ -59,7 +48,7 @@ export const workoutSetRowObjectsToWorkouts = (
       set_created_at,
     } = item;
 
-    const workoutData: IWorkoutOut = {
+    const workoutData: IWorkout = {
       workout_id: workoutId,
       workout_name,
       workout_created_at,
@@ -95,41 +84,5 @@ export const workoutSetRowObjectsToWorkouts = (
     workout.sets.sort((a: any, b: any) => a.set_id - b.set_id);
   });
 
-  // Transform that sets are listed under a movement name
-  const transformed: Array<IWorkoutOutputJSON> = sortedWorkouts.map(
-    (workout: any): any => {
-      const movements: any = {};
-      const sets = workout.sets;
-
-      sets.forEach((set: ISet) => {
-        if (movements[set.movement_name] === undefined) {
-          movements[set.movement_name] = [set];
-        } else {
-          movements[set.movement_name].push(set);
-        }
-      });
-
-      return {
-        ...workout,
-        movements: movements,
-      };
-    }
-  );
-
-  // No need for sets anymore
-  transformed.forEach((workout: any) => {
-    delete workout.sets;
-  });
-
-  return transformed;
-};
-
-export const transformToRowObjects = (
-  workoutMovements: IWorkoutMovements
-): Array<ISet> => {
-  const listOfSets: Array<Array<ISet>> = Object.values(workoutMovements);
-  return listOfSets.reduce((acc: Array<ISet>, current: Array<ISet>) => [
-    ...acc,
-    ...current,
-  ]);
+  return sortedWorkouts;
 };

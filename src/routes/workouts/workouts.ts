@@ -19,13 +19,13 @@ import {
   getUserTransformedWorkouts,
   insertToMovementTable,
   insertToUserMovementTable,
-  IWorkout,
+  IDbWorkout,
   linkSetsToWorkout,
   updateWorkoutName,
   updateWorkoutSets,
 } from '../repository/workouts';
 
-import { IWorkoutOutputJSON, transformToRowObjects } from '../repository/json';
+import { IWorkout } from '../repository/json';
 
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
@@ -58,7 +58,7 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
 router.put('/:workoutId', auth, async (req: any, res: any) => {
   const userId = req.user.id;
   const { workoutId } = req.params;
-  const editedWorkout: IWorkoutOutputJSON = req.body;
+  const editedWorkout: IWorkout = req.body;
 
   try {
     const workoutName = editedWorkout.workout_name;
@@ -69,9 +69,7 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       return;
     }
 
-    const sets = transformToRowObjects(editedWorkout.movements);
-
-    const movementNames = sets.map(set => set.movement_name);
+    const movementNames = editedWorkout.sets.map(set => set.movement_name);
     const uniqueNames = [...new Set(movementNames)];
 
     const movementIds: any = {};
@@ -111,7 +109,7 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       movementIds[name] = userMovementId;
     }
 
-    await updateWorkoutSets(sets, userId, workoutId, movementIds);
+    await updateWorkoutSets(editedWorkout.sets, userId, workoutId, movementIds);
 
     res.sendStatus(200);
   } catch (error) {
@@ -178,15 +176,22 @@ router.post('/new', auth, async (req: any, res: any) => {
 
   try {
     // Create a new workout
-    const newWorkoutId = await createNewWorkout(userId, workout.name);
+    const newWorkoutId = await createNewWorkout(userId, workout.workout_name);
     if (!newWorkoutId) {
       res.sendStatus(500);
       return;
     }
 
     // Insert to movements table if needed
-    const movementNames: string[] = workout.movements.map(item => item.name);
-    const movementIds: string[] = await insertToMovementTable(movementNames);
+    const movementNames: string[] = workout.sets.map(
+      item => item.movement_name
+    );
+
+    const movementIds: string[] = [];
+    for (const movementName of movementNames) {
+      const movementId = await insertToMovementTable(movementName);
+      if (movementId) movementIds.push(movementId);
+    }
 
     // Update user movements table if needed
     await insertToUserMovementTable(movementIds, userId);

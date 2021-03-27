@@ -1,5 +1,5 @@
 import db from '../../db';
-import { workoutSetRowObjectsToWorkouts } from './json';
+import { IWorkout, workoutSetRowObjectsToWorkouts } from './json';
 
 export interface DbWorkoutObject {
   id: number;
@@ -25,7 +25,7 @@ interface IMovementSection {
   sets: ISet[];
 }
 
-export interface IWorkout {
+export interface IDbWorkout {
   name: string;
   movements: IMovementSection[];
   createdAt: string;
@@ -45,18 +45,19 @@ interface DbWorkoutSet {
 }
 
 export const insertToMovementTable = async (
-  movementNames: string[]
-): Promise<string[]> => {
+  movementName: string
+): Promise<string | null> => {
   const setMovementsSql = `
       INSERT INTO movements (name)
-      VALUES 
-      ${movementNames.map((_, index) => `($${index + 1})`).join(',\n')}
+      VALUES ($1)
       ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
       RETURNING id;
       `;
-  const movementUpdate = await db.query(setMovementsSql, movementNames);
+  const movementUpdate = await db.query(setMovementsSql, [movementName]);
 
-  return movementUpdate.rows.map(obj => obj.id);
+  const id = movementUpdate.rows[0].id;
+  if (!id) return null;
+  return id;
 };
 
 export const insertToUserMovementTable = async (
@@ -84,32 +85,37 @@ export const linkSetsToWorkout = async (
   userId: string,
   newWorkoutId: string
 ) => {
-  for (const [index, movement] of workout.movements.entries()) {
-    const userMovementSql = `
+  const cache: any = {};
+  for (const [index, set] of workout.sets.entries()) {
+    let userMovementId;
+    if (!(movementIds[index] in cache)) {
+      const userMovementSql = `
       SELECT id from user_movements
       WHERE movement_id = $1 AND user_id = $2;
       `;
-    const userMovementResponse = await db.query(userMovementSql, [
-      movementIds[index],
-      userId,
-    ]);
-    const userMovementId = userMovementResponse.rows[0].id;
-
-    for (const set of movement.sets) {
-      const setAddSql = `
-        INSERT INTO sets
-          (reps, weight, user_id, user_movement_id, workout_id)
-        VALUES
-          ($1, $2, $3, $4, $5)
-        `;
-      await db.query(setAddSql, [
-        set.reps,
-        set.weight,
+      const userMovementResponse = await db.query(userMovementSql, [
+        movementIds[index],
         userId,
-        userMovementId,
-        newWorkoutId,
       ]);
+      userMovementId = userMovementResponse.rows[0].id;
+      cache[movementIds[index]] = userMovementId;
+    } else {
+      userMovementId = cache[movementIds[index]];
     }
+
+    const setAddSql = `
+      INSERT INTO sets
+        (reps, weight, user_id, user_movement_id, workout_id)
+      VALUES
+        ($1, $2, $3, $4, $5)
+      `;
+    await db.query(setAddSql, [
+      set.reps,
+      set.weight,
+      userId,
+      userMovementId,
+      newWorkoutId,
+    ]);
   }
 };
 
