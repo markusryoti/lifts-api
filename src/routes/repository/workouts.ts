@@ -126,6 +126,8 @@ export const updateWorkoutSets = async (
   userMovementIds: any
 ) => {
   for (const set of sets) {
+    console.log(userMovementIds[set.movement_name]);
+
     const sqlWithMovementChanges = `
       UPDATE sets
       SET
@@ -278,19 +280,19 @@ export const createNewWorkout = async (
 
 export const createNewSet = async (
   reps: string,
-  weightToAdd: string,
+  weight: string,
   userId: string,
   userMovementId: string,
   workoutId: string
-): Promise<any> => {
+): Promise<ISet | null> => {
   const sql = `
     INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id)
     VALUES ($1, $2, $3, $4, $5)
     RETURNING id AS set_id, reps, weight, user_movement_id,
     created_at AS set_created_at`;
-  const values = [reps, weightToAdd, userId, userMovementId, workoutId];
+  const values = [reps, weight, userId, userMovementId, workoutId];
   const result = await db.query(sql, values);
-  const addedSet = result.rows[0];
+  const addedSet: ISet = result.rows[0];
 
   if (!addedSet) return null;
   return addedSet;

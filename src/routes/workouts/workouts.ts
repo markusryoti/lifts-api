@@ -25,7 +25,7 @@ import {
   updateWorkoutSets,
 } from '../repository/workouts';
 
-import { IWorkout } from '../repository/json';
+import { ISet, IWorkout } from '../repository/json';
 
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
@@ -55,6 +55,33 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
   }
 });
 
+const addMissingSets = async (
+  allSets: Array<ISet>,
+  userId: string,
+  movementIds: any,
+  workoutId: string
+) => {
+  const setsWithAddedIds = [];
+  for (const set of allSets) {
+    if (set.set_id === '') {
+      const newSet = await createNewSet(
+        set.reps.toString(),
+        set.weight.toString(),
+        userId,
+        movementIds[set.movement_name],
+        workoutId
+      );
+      if (newSet) {
+        setsWithAddedIds.push({ ...newSet, movement_name: set.movement_name });
+        continue;
+      }
+      throw new Error('Error while updating set values');
+    }
+    setsWithAddedIds.push(set);
+  }
+  return setsWithAddedIds;
+};
+
 router.put('/:workoutId', auth, async (req: any, res: any) => {
   const userId = req.user.id;
   const { workoutId } = req.params;
@@ -76,7 +103,7 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
     for (const name of uniqueNames) {
       const movementRow = await seeIfMovementInMovementTable(name);
 
-      let movementId: string = '';
+      let movementId = '';
       let userMovementId;
 
       if (!movementRow) {
@@ -109,7 +136,14 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       movementIds[name] = userMovementId;
     }
 
-    await updateWorkoutSets(editedWorkout.sets, userId, workoutId, movementIds);
+    const setsWithAddedIds = await addMissingSets(
+      editedWorkout.sets,
+      userId,
+      movementIds,
+      workoutId
+    );
+
+    await updateWorkoutSets(setsWithAddedIds, userId, workoutId, movementIds);
 
     res.sendStatus(200);
   } catch (error) {
