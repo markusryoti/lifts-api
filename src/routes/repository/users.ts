@@ -17,7 +17,8 @@ export interface UserDbResponse {
  * Takes login type (email/username) and returns user object
  * @param loginType login type (email/username)
  * @param loginValue login value (e.g. user@gmail.com or user123)
- * @returns user object from database as json or null if not found
+ * @returns Promise with `DbUser` object from database as json or `null` if not found
+ * @throws Throw an error if can't get user
  */
 export const getUserWithUsernameOrEmail = async (
   loginType: string,
@@ -40,7 +41,7 @@ export const getUserWithUsernameOrEmail = async (
     return null;
   } catch (error) {
     console.error(error.stack);
-    return null;
+    throw new Error("Couldn't get user from database");
   }
 };
 
@@ -49,7 +50,8 @@ export const getUserWithUsernameOrEmail = async (
  * @param username
  * @param email
  * @param hashedPassword
- * @returns new user object from database as json or null if error occured
+ * @returns Promise with `DbUser` object from database as json or `null` if error occured
+ * @throws Throw an error if couldn't add a new user
  */
 export const createNewUser = async (
   username: string,
@@ -64,6 +66,6 @@ export const createNewUser = async (
     return result.rows[0];
   } catch (error) {
     console.error(error.stack);
-    return null;
+    throw new Error("Couldn't insert new user");
   }
 };

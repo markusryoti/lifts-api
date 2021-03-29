@@ -2,6 +2,7 @@ import express from 'express';
 const router = express.Router();
 
 import auth from '../../middleware/auth';
+
 import {
   addMovementToMovementTable,
   addMovementToUserMovementTable,
@@ -9,33 +10,37 @@ import {
   getUserMovementIdByMovementName,
   seeIfMovementInMovementTable,
 } from '../repository/movements';
+
 import {
-  createNewSet,
   createNewWorkout,
-  deleteMovementFromWorkout,
-  deleteSetByIdAndUserId,
   deleteWorkoutById,
-  getUserTransformedWorkoutById,
-  getUserTransformedWorkouts,
-  insertToMovementTable,
+  insertToOrUpdateMovementTable,
   insertToUserMovementTable,
-  IDbWorkout,
   linkSetsToWorkout,
   updateWorkoutName,
-  updateWorkoutSets,
 } from '../repository/workouts';
 
-import { ISet, IWorkout } from '../repository/json';
+import {
+  getUserTransformedWorkouts,
+  getUserTransformedWorkoutById,
+  ISet,
+  createNewSet,
+  updateWorkoutSets,
+  deleteMovementFromWorkout,
+  deleteSetByIdAndUserId,
+} from '../repository/sets';
+
+import { IWorkout } from '../repository/json';
 
 router.get('/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
 
   try {
     const transformedWorkouts = await getUserTransformedWorkouts(userId);
-    res.send(transformedWorkouts);
+    return res.send(transformedWorkouts);
   } catch (error) {
     console.log(error.stack);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
@@ -48,17 +53,17 @@ router.get('/:workoutId', auth, async (req: any, res: any) => {
       userId,
       workoutId
     );
-    res.send(transformedWorkoutById);
+    return res.send(transformedWorkoutById);
   } catch (error) {
     console.log(error.stack);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
 const addMissingSets = async (
   allSets: Array<ISet>,
   userId: string,
-  movementIds: any,
+  userMovementIds: any,
   workoutId: string
 ) => {
   const setsWithAddedIds = [];
@@ -68,7 +73,7 @@ const addMissingSets = async (
         set.reps.toString(),
         set.weight.toString(),
         userId,
-        movementIds[set.movement_name],
+        userMovementIds[set.movement_name],
         workoutId
       );
       if (newSet) {
@@ -92,14 +97,13 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
 
     const nameUpdateResult = await updateWorkoutName(workoutName, workoutId);
     if (!nameUpdateResult) {
-      res.sendStatus(500);
-      return;
+      return res.sendStatus(500);
     }
 
     const movementNames = editedWorkout.sets.map(set => set.movement_name);
     const uniqueNames = [...new Set(movementNames)];
 
-    const movementIds: any = {};
+    const userMovementIds: any = {};
     for (const name of uniqueNames) {
       const movementRow = await seeIfMovementInMovementTable(name);
 
@@ -109,8 +113,7 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       if (!movementRow) {
         const newMovement = await addMovementToMovementTable(name);
         if (!newMovement) {
-          res.sendStatus(500);
-          return;
+          return res.sendStatus(500);
         }
         movementId = newMovement.id.toString();
       } else {
@@ -133,22 +136,27 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
       } else {
         userMovementId = userMovementRow.user_movement_id;
       }
-      movementIds[name] = userMovementId;
+      userMovementIds[name] = userMovementId;
     }
 
     const setsWithAddedIds = await addMissingSets(
       editedWorkout.sets,
       userId,
-      movementIds,
+      userMovementIds,
       workoutId
     );
 
-    await updateWorkoutSets(setsWithAddedIds, userId, workoutId, movementIds);
+    await updateWorkoutSets(
+      setsWithAddedIds,
+      userId,
+      workoutId,
+      userMovementIds
+    );
 
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (error) {
     console.log(error.stack);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
@@ -159,13 +167,12 @@ router.delete('/:workoutId', auth, async (req: any, res: any) => {
   try {
     const success = await deleteWorkoutById(workoutId, userId);
     if (!success) {
-      res.sendStatus(500);
-      return;
+      return res.sendStatus(500);
     }
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (error) {
     console.log(error.stack);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
@@ -196,10 +203,10 @@ router.delete(
         return;
       }
 
-      res.sendStatus(200);
+      return res.sendStatus(200);
     } catch (error) {
       console.log(error.stack);
-      res.sendStatus(500);
+      return res.sendStatus(500);
     }
   }
 );
@@ -212,18 +219,18 @@ router.post('/new', auth, async (req: any, res: any) => {
     // Create a new workout
     const newWorkoutId = await createNewWorkout(userId, workout.workout_name);
     if (!newWorkoutId) {
-      res.sendStatus(500);
-      return;
+      return res.sendStatus(500);
     }
 
-    // Insert to movements table if needed
     const movementNames: string[] = workout.sets.map(
       item => item.movement_name
     );
 
+    // Insert to movements table if needed, else do an update without new values
+    // TODO remove duplicate checks/updates
     const movementIds: string[] = [];
     for (const movementName of movementNames) {
-      const movementId = await insertToMovementTable(movementName);
+      const movementId = await insertToOrUpdateMovementTable(movementName);
       if (movementId) movementIds.push(movementId);
     }
 
@@ -233,10 +240,10 @@ router.post('/new', auth, async (req: any, res: any) => {
     // Add workout/movement data to sets
     await linkSetsToWorkout(workout, movementIds, userId, newWorkoutId);
 
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (error) {
     console.log(error);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 
@@ -262,10 +269,9 @@ router.post('/:workoutId/sets/', auth, async (req: any, res: any) => {
 
   try {
     if (!inputsAreValid(reps, userId, userMovementId)) {
-      res
+      return res
         .status(403)
         .send('Not valid, must include reps, userId and userMovementId');
-      return;
     }
 
     const weightToAdd = weight === undefined ? '' : weight;
@@ -278,15 +284,13 @@ router.post('/:workoutId/sets/', auth, async (req: any, res: any) => {
       workoutId
     );
     if (!addedSet) {
-      res.sendStatus(500);
-      return;
+      return res.sendStatus(500);
     }
 
-    res.send(addedSet);
+    return res.send(addedSet);
   } catch (error) {
     console.log(error.stack);
-    res.sendStatus(500);
-    return;
+    return res.sendStatus(500);
   }
 });
 
@@ -300,14 +304,12 @@ router.delete(
     try {
       const deleteSuccess = await deleteSetByIdAndUserId(setId, userId);
       if (!deleteSuccess) {
-        res.sendStatus(500);
-        return;
+        return res.sendStatus(500);
       }
       res.sendStatus(200);
     } catch (error) {
       console.log(error.stack);
-      res.sendStatus(500);
-      return;
+      return res.sendStatus(500);
     }
   }
 );

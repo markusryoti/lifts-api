@@ -16,10 +16,9 @@ import {
 router.post('/', async (req: any, res: any) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) {
-    res
+    return res
       .sendStatus(400)
       .send('Invalid request, must contain username, email and password');
-    return;
   }
 
   try {
@@ -27,8 +26,7 @@ router.post('/', async (req: any, res: any) => {
     console.log(existingUser);
 
     if (existingUser) {
-      res.status(403).json('User with email already exists');
-      return;
+      return res.status(403).json('User with email already exists');
     }
 
     const hashedPassword = bcrypt.hashSync(
@@ -43,8 +41,7 @@ router.post('/', async (req: any, res: any) => {
     );
 
     if (!newUser) {
-      res.status(500).json('Error occured while creating a new user');
-      return;
+      return res.status(500).json('Error occured while creating a new user');
     }
 
     const payload = {
@@ -56,10 +53,10 @@ router.post('/', async (req: any, res: any) => {
       expiresIn: process.env.TOKEN_EXPIRATION_TIME,
     });
 
-    res.json(token);
+    return res.json(token);
   } catch (err) {
     console.log(err.stack);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 

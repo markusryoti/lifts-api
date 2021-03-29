@@ -1,5 +1,5 @@
 import db from '../../db';
-import { IWorkout, workoutSetRowObjectsToWorkouts } from './json';
+import { IWorkout } from './json';
 
 export interface DbWorkoutObject {
   id: number;
@@ -13,58 +13,43 @@ export interface DbNewWorkoutResponse {
   rows: DbWorkoutObject[];
 }
 
-interface ISet {
-  movement_name: any;
-  set_id: string;
-  reps: number;
-  weight: number;
-}
-
-interface IMovementSection {
-  name: string;
-  sets: ISet[];
-}
-
-export interface IDbWorkout {
-  name: string;
-  movements: IMovementSection[];
-  createdAt: string;
-}
-
-interface DbWorkoutSet {
-  set_id: string;
-  reps: number;
-  weight: number;
-  workout_id: string;
-  workout_created_at: Date;
-  workout_name: string;
-  movement_name: string;
-  movement_id: string;
-  user_movement_id: string;
-  set_created_at: Date;
-}
-
-export const insertToMovementTable = async (
+/**
+ * Insert a new movement to movements. Update if exists already
+ * @param movementName Name of the new/updated movement
+ * @returns Id of the added movement or null
+ */
+export const insertToOrUpdateMovementTable = async (
   movementName: string
 ): Promise<string | null> => {
-  const setMovementsSql = `
+  try {
+    const sql = `
       INSERT INTO movements (name)
       VALUES ($1)
       ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name
       RETURNING id;
       `;
-  const movementUpdate = await db.query(setMovementsSql, [movementName]);
-
-  const id = movementUpdate.rows[0].id;
-  if (!id) return null;
-  return id;
+    const movementUpdate = await db.query(sql, [movementName]);
+    const id = movementUpdate.rows[0].id;
+    if (!id) return null;
+    return id;
+  } catch (error) {
+    console.error(error.stack);
+    throw new Error('Inserting a movement failed');
+  }
 };
 
+/**
+ * Adds multiple movements to user_movements
+ * @param movementIds List of
+ * @param userId User id
+ * @throws Throws an error if something fails
+ */
 export const insertToUserMovementTable = async (
   movementIds: string[],
   userId: string
 ): Promise<void> => {
-  const addUserMovementIfNotExists = `
+  try {
+    const sql = `
       INSERT INTO user_movements (movement_id, user_id)
       SELECT $1, $2
       WHERE
@@ -73,227 +58,143 @@ export const insertToUserMovementTable = async (
           WHERE user_id = $2 AND movement_id = $1
         ) RETURNING id;
     `;
-
-  for (const movementId of movementIds) {
-    await db.query(addUserMovementIfNotExists, [movementId, userId]);
+    for (const movementId of movementIds) {
+      await db.query(sql, [movementId, userId]);
+    }
+  } catch (error) {
+    console.error(error.stack);
+    throw new Error('Adding movements to user_movements failed');
   }
 };
 
+/**
+ * Adds workout/movement data to new sets
+ * @param workout `IWorkout` object
+ * @param movementIds Movement ids to add
+ * @param userId User id
+ * @param newWorkoutId Id of the new workout
+ * @throws Throw error if set creation failed
+ */
 export const linkSetsToWorkout = async (
   workout: IWorkout,
   movementIds: string[],
   userId: string,
   newWorkoutId: string
 ) => {
-  const cache: any = {};
-  for (const [index, set] of workout.sets.entries()) {
-    let userMovementId;
-    if (!(movementIds[index] in cache)) {
-      const userMovementSql = `
-      SELECT id from user_movements
+  try {
+    const cache: any = {};
+    for (const [index, set] of workout.sets.entries()) {
+      let userMovementId;
+
+      // Get user movement ids, either from cache or database
+      // TODO
+      // Could this be handled in insertToUserMovementTable?
+      if (!(movementIds[index] in cache)) {
+        const userMovementSql = `
+      SELECT id FROM user_movements
       WHERE movement_id = $1 AND user_id = $2;
       `;
-      const userMovementResponse = await db.query(userMovementSql, [
-        movementIds[index],
-        userId,
-      ]);
-      userMovementId = userMovementResponse.rows[0].id;
-      cache[movementIds[index]] = userMovementId;
-    } else {
-      userMovementId = cache[movementIds[index]];
-    }
+        const userMovementResponse = await db.query(userMovementSql, [
+          movementIds[index],
+          userId,
+        ]);
+        userMovementId = userMovementResponse.rows[0].id;
+        cache[movementIds[index]] = userMovementId;
+      } else {
+        userMovementId = cache[movementIds[index]];
+      }
 
-    const setAddSql = `
+      // Finally add new sets
+      const setAddSql = `
       INSERT INTO sets
         (reps, weight, user_id, user_movement_id, workout_id)
       VALUES
         ($1, $2, $3, $4, $5)
       `;
-    await db.query(setAddSql, [
-      set.reps,
-      set.weight,
-      userId,
-      userMovementId,
-      newWorkoutId,
-    ]);
+      await db.query(setAddSql, [
+        set.reps,
+        set.weight,
+        userId,
+        userMovementId,
+        newWorkoutId,
+      ]);
+    }
+  } catch (error) {
+    console.error(error.stack);
+    throw new Error('Adding new sets to workout failed');
   }
 };
 
-export const updateWorkoutSets = async (
-  sets: ISet[],
-  userId: string,
-  workoutId: string,
-  userMovementIds: any
-) => {
-  for (const set of sets) {
-    console.log(userMovementIds[set.movement_name]);
-
-    const sqlWithMovementChanges = `
-      UPDATE sets
-      SET
-        reps = $1,
-        weight = $2,
-        user_movement_id = $3,
-        updated_at = current_timestamp
-      WHERE user_id = $4 AND workout_id = $5 AND id = $6
-      `;
-    await db.query(sqlWithMovementChanges, [
-      set.reps.toString(),
-      set.weight.toString(),
-      userMovementIds[set.movement_name],
-      userId,
-      workoutId,
-      set.set_id,
-    ]);
-  }
-};
-
-export const getUserTransformedWorkouts = async (userId: string) => {
-  const sql = `
-      SELECT
-        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
-        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, movements.id AS movement_id,
-        user_movements.id AS user_movement_id,
-        sets.created_at AS set_created_at
-      FROM sets
-      JOIN users ON sets.user_id = users.id
-      JOIN workouts ON sets.workout_id = workouts.id
-      JOIN user_movements ON user_movements.id = sets.user_movement_id
-      JOIN movements ON user_movements.movement_id = movements.id
-      WHERE users.id = $1 
-      ORDER BY workouts.created_at DESC;
-    `;
-  const result = await db.query(sql, [userId]);
-  const workoutSets: Array<DbWorkoutSet> | undefined = result.rows;
-
-  if (workoutSets.length > 0) {
-    const transformedWorkouts = workoutSetRowObjectsToWorkouts(workoutSets);
-    return transformedWorkouts;
-  }
-  return null;
-};
-
-export const getUserTransformedWorkoutById = async (
-  userId: string,
-  workoutId: string
-) => {
-  const sql = `
-      SELECT
-        sets.id AS set_id, reps, weight, workouts.id AS workout_id,
-        workouts.created_at AS workout_created_at, workouts.name AS workout_name,
-        movements.name AS movement_name, movements.id AS movement_id,
-        user_movements.id AS user_movement_id,
-        sets.created_at AS set_created_at      
-      FROM sets
-      JOIN users ON sets.user_id = users.id
-      JOIN workouts ON sets.workout_id = workouts.id
-      JOIN user_movements ON user_movements.id = sets.user_movement_id
-      JOIN movements ON user_movements.movement_id = movements.id
-      WHERE users.id = $1 AND sets.workout_id = $2
-      ORDER BY workouts.created_at DESC;
-    `;
-  const result = await db.query(sql, [userId, workoutId]);
-  const workoutSet: Array<DbWorkoutSet> | undefined = result.rows;
-
-  if (workoutSet) {
-    const transformedWorkouts = workoutSetRowObjectsToWorkouts(workoutSet);
-    return transformedWorkouts[0];
-  }
-  return null;
-};
-
+/**
+ * Updates workout name
+ * @param newName Name to update
+ * @param id Workout id
+ * @returns `boolean` whether the insert was successful or not
+ */
 export const updateWorkoutName = async (
   newName: string,
-  newId: string
+  id: string
 ): Promise<boolean> => {
-  const sql = `
+  try {
+    const sql = `
     UPDATE workouts
     SET name = $1, updated_at = current_timestamp
     WHERE id = $2;
   `;
-  const nameUpdateResult = await db.query(sql, [newName, newId]);
-  if (nameUpdateResult.rowCount === 0) return false;
-  return true;
+    const nameUpdateResult = await db.query(sql, [newName, id]);
+    if (nameUpdateResult.rowCount === 0) return false;
+    return true;
+  } catch (error) {
+    console.error(error.stack);
+    throw new Error("Couldn't update workout name");
+  }
 };
 
+/**
+ * Deletes a workout with given id
+ * @param id Workout id
+ * @param userId User id
+ */
 export const deleteWorkoutById = async (
   id: string,
   userId: string
 ): Promise<boolean> => {
-  const sql = `
+  try {
+    const sql = `
       DELETE FROM workouts
       WHERE id = $1 AND user_id = $2;
     `;
-  const result = await db.query(sql, [id, userId]);
-  if (result.rowCount === 0) {
-    return false;
+    const result = await db.query(sql, [id, userId]);
+    if (result.rowCount === 0) {
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error(error.stack);
+    throw new Error("Couldn't delete workout");
   }
-  return true;
 };
 
-export const deleteMovementFromWorkout = async (
-  workoutId: string,
-  userId: string,
-  userMovementId: string
-): Promise<boolean> => {
-  const sql = `
-      DELETE FROM sets
-      WHERE workout_id = $1 AND user_id = $2
-      AND user_movement_id = $3;
-    `;
-  const result = await db.query(sql, [workoutId, userId, userMovementId]);
-  if (result.rowCount === 0) {
-    return false;
-  }
-  return true;
-};
-
-export const deleteSetByIdAndUserId = async (
-  setId: string,
-  userId: string
-): Promise<boolean> => {
-  const sql = `
-      DELETE FROM sets
-      WHERE id = $1 AND user_id = $2;
-    `;
-  const result = await db.query(sql, [setId, userId]);
-  if (result.rowCount === 0) {
-    return false;
-  }
-  return true;
-};
-
+/**
+ * Create a new workout with user id and workout name
+ * @param userId User id
+ * @param name Name of the workout
+ */
 export const createNewWorkout = async (
   userId: string,
   name: string
 ): Promise<string | null> => {
-  const sql =
-    'INSERT INTO workouts (user_id, name) VALUES ($1, $2) RETURNING id';
-  const newWorkoutResult = await db.query(sql, [userId, name]);
-  const newWorkoutId = newWorkoutResult.rows[0].id;
-  if (!newWorkoutId) {
-    return null;
+  try {
+    const sql =
+      'INSERT INTO workouts (user_id, name) VALUES ($1, $2) RETURNING id';
+    const newWorkoutResult = await db.query(sql, [userId, name]);
+    const newWorkoutId = newWorkoutResult.rows[0].id;
+    if (!newWorkoutId) {
+      return null;
+    }
+    return newWorkoutId;
+  } catch (error) {
+    console.error(error.stack);
+    throw new Error("Couldn't create new workout");
   }
-  return newWorkoutId;
-};
-
-export const createNewSet = async (
-  reps: string,
-  weight: string,
-  userId: string,
-  userMovementId: string,
-  workoutId: string
-): Promise<ISet | null> => {
-  const sql = `
-    INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING id AS set_id, reps, weight, user_movement_id,
-    created_at AS set_created_at`;
-  const values = [reps, weight, userId, userMovementId, workoutId];
-  const result = await db.query(sql, values);
-  const addedSet: ISet = result.rows[0];
-
-  if (!addedSet) return null;
-  return addedSet;
 };

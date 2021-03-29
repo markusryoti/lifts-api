@@ -14,15 +14,15 @@ router.get('/', auth, async (req: any, res: any) => {
     );
 
     if (!user) {
-      res.status(404).json('No user exists with given username');
+      return res.status(404).json('No user exists with given username');
     }
 
     delete user?.password;
 
-    res.send(user);
+    return res.send(user);
   } catch (error) {
     console.log(error.stack);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 });
 

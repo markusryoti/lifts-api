@@ -1,44 +1,23 @@
-interface WorkoutJsonItem {
-  workout_id: string;
-  workout_name: string;
-  workout_created_at: Date;
-  set_id: string;
-  reps: number;
-  weight: number;
-  user_movement_id: string;
-  movement_id: string;
-  movement_name: string;
-  set_created_at: Date;
-}
-
-export interface ISet {
-  set_id: string;
-  reps: number;
-  weight: number;
-  user_movement_id: string;
-  movement_id: string;
-  movement_name: string;
-  set_created_at: Date;
-}
+import { DbWorkoutSet, ISet } from './sets';
 
 export interface IWorkout {
   workout_id: string;
   workout_name: string;
   workout_created_at: Date;
+  workout_updated_at: Date;
   sets: ISet[];
 }
 
-export const workoutSetRowObjectsToWorkouts = (
-  json: Array<WorkoutJsonItem>
-) => {
+export const workoutSetRowObjectsToWorkouts = (json: Array<DbWorkoutSet>) => {
   const workouts: any = {};
 
   //  Loop through the json and convert set rows to workout objectss
-  json.forEach((item: WorkoutJsonItem) => {
+  json.forEach((item: DbWorkoutSet) => {
     const workoutId = item.workout_id.toString();
     const {
       workout_name,
       workout_created_at,
+      workout_updated_at,
       set_id,
       reps,
       weight,
@@ -46,12 +25,14 @@ export const workoutSetRowObjectsToWorkouts = (
       movement_id,
       movement_name,
       set_created_at,
+      set_updated_at,
     } = item;
 
     const workoutData: IWorkout = {
       workout_id: workoutId,
       workout_name,
       workout_created_at,
+      workout_updated_at,
       sets: [],
     };
     const setData: ISet = {
@@ -62,6 +43,7 @@ export const workoutSetRowObjectsToWorkouts = (
       movement_id,
       movement_name,
       set_created_at,
+      set_updated_at,
     };
 
     if (workouts[workoutId] === undefined) {
