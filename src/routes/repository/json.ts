@@ -35,6 +35,7 @@ export const workoutSetRowObjectsToWorkouts = (json: Array<DbWorkoutSet>) => {
       workout_updated_at,
       sets: [],
     };
+
     const setData: ISet = {
       set_id,
       reps,
@@ -63,7 +64,9 @@ export const workoutSetRowObjectsToWorkouts = (json: Array<DbWorkoutSet>) => {
   // Sort sets in workouts
   // Now with set ids, maybe change to timestamps
   sortedWorkouts.forEach((workout: any) => {
-    workout.sets.sort((a: any, b: any) => a.set_id - b.set_id);
+    workout.sets.sort(
+      (a: ISet, b: ISet) => parseInt(a.set_id) - parseInt(b.set_id)
+    );
   });
 
   return sortedWorkouts;

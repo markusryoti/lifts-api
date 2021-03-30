@@ -14,6 +14,7 @@ const PORT = 5000;
 
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
+
 app.use('/signup', signup);
 app.use('/login', login);
 app.use('/users', users);
@@ -26,5 +27,5 @@ app.get('/', async (req, res) => {
 });
 
 app.listen(PORT, async () => {
-  console.log(`Express with Typescript! http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });

@@ -17,13 +17,13 @@ export interface UserDbResponse {
  * Takes login type (email/username) and returns user object
  * @param loginType login type (email/username)
  * @param loginValue login value (e.g. user@gmail.com or user123)
- * @returns Promise with `DbUser` object from database as json or `null` if not found
+ * @returns Promise with `DbUser` object from database as json
  * @throws Throw an error if can't get user
  */
 export const getUserWithUsernameOrEmail = async (
   loginType: string,
   loginValue: string
-): Promise<DbUser | null> => {
+): Promise<DbUser> => {
   let sql;
   let result: UserDbResponse;
   try {
@@ -38,7 +38,7 @@ export const getUserWithUsernameOrEmail = async (
     if (user) {
       return user;
     }
-    return null;
+    throw new Error();
   } catch (error) {
     console.error(error.stack);
     throw new Error("Couldn't get user from database");
@@ -50,20 +50,24 @@ export const getUserWithUsernameOrEmail = async (
  * @param username
  * @param email
  * @param hashedPassword
- * @returns Promise with `DbUser` object from database as json or `null` if error occured
+ * @returns Promise with `DbUser` object from database as json
  * @throws Throw an error if couldn't add a new user
  */
 export const createNewUser = async (
   username: string,
   email: string,
   hashedPassword: string
-): Promise<DbUser | null> => {
+): Promise<DbUser> => {
   try {
     const sql =
       'INSERT INTO users(username, email, password) VALUES($1, $2, $3) RETURNING *';
     const values = [username, email, hashedPassword];
-    const result: UserDbResponse = await db.query(sql, values);
-    return result.rows[0];
+    const result = await db.query(sql, values);
+    const user = result.rows[0];
+    if (user) {
+      return user;
+    }
+    throw new Error();
   } catch (error) {
     console.error(error.stack);
     throw new Error("Couldn't insert new user");

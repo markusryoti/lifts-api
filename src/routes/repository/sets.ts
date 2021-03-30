@@ -162,7 +162,7 @@ export const deleteMovementFromWorkout = async (
   workoutId: string,
   userId: string,
   userMovementId: string
-): Promise<boolean> => {
+): Promise<void> => {
   try {
     const sql = `
       DELETE FROM sets
@@ -171,9 +171,8 @@ export const deleteMovementFromWorkout = async (
     `;
     const result = await db.query(sql, [workoutId, userId, userMovementId]);
     if (result.rowCount === 0) {
-      return false;
+      throw new Error();
     }
-    return true;
   } catch (error) {
     console.error(error.stack);
     throw new Error('Deleting movement failed');
@@ -190,7 +189,7 @@ export const deleteMovementFromWorkout = async (
 export const deleteSetByIdAndUserId = async (
   setId: string,
   userId: string
-): Promise<boolean> => {
+): Promise<void> => {
   try {
     const sql = `
       DELETE FROM sets
@@ -198,9 +197,8 @@ export const deleteSetByIdAndUserId = async (
     `;
     const result = await db.query(sql, [setId, userId]);
     if (result.rowCount === 0) {
-      return false;
+      throw new Error();
     }
-    return true;
   } catch (error) {
     console.error(error.stack);
     throw new Error('Deleting set failed');
@@ -214,6 +212,7 @@ export const deleteSetByIdAndUserId = async (
  * @param userId User id
  * @param userMovementId User movement id
  * @param workoutId Workout id
+ * @throws Throw an exception if insert fails
  */
 export const createNewSet = async (
   reps: string,
@@ -221,16 +220,21 @@ export const createNewSet = async (
   userId: string,
   userMovementId: string,
   workoutId: string
-): Promise<ISet | null> => {
-  const sql = `
+): Promise<ISet> => {
+  try {
+    const sql = `
     INSERT INTO sets (reps, weight, user_id, user_movement_id, workout_id)
     VALUES ($1, $2, $3, $4, $5)
     RETURNING id AS set_id, reps, weight, user_movement_id,
     created_at AS set_created_at`;
-  const values = [reps, weight, userId, userMovementId, workoutId];
-  const result = await db.query(sql, values);
-  const addedSet: ISet = result.rows[0];
+    const values = [reps, weight, userId, userMovementId, workoutId];
+    const result = await db.query(sql, values);
+    const addedSet: ISet = result.rows[0];
 
-  if (!addedSet) return null;
-  return addedSet;
+    if (addedSet) return addedSet;
+    throw new Error();
+  } catch (error) {
+    console.error(error.stack);
+    throw new Error('Error while inserting a new set');
+  }
 };

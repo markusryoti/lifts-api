@@ -134,7 +134,7 @@ export const linkSetsToWorkout = async (
 export const updateWorkoutName = async (
   newName: string,
   id: string
-): Promise<boolean> => {
+): Promise<void> => {
   try {
     const sql = `
     UPDATE workouts
@@ -142,8 +142,9 @@ export const updateWorkoutName = async (
     WHERE id = $2;
   `;
     const nameUpdateResult = await db.query(sql, [newName, id]);
-    if (nameUpdateResult.rowCount === 0) return false;
-    return true;
+    if (nameUpdateResult.rowCount == 0) {
+      throw new Error();
+    }
   } catch (error) {
     console.error(error.stack);
     throw new Error("Couldn't update workout name");
@@ -154,11 +155,12 @@ export const updateWorkoutName = async (
  * Deletes a workout with given id
  * @param id Workout id
  * @param userId User id
+ * @throws Throw an error if deletion failed
  */
 export const deleteWorkoutById = async (
   id: string,
   userId: string
-): Promise<boolean> => {
+): Promise<void> => {
   try {
     const sql = `
       DELETE FROM workouts
@@ -166,9 +168,8 @@ export const deleteWorkoutById = async (
     `;
     const result = await db.query(sql, [id, userId]);
     if (result.rowCount === 0) {
-      return false;
+      throw new Error();
     }
-    return true;
   } catch (error) {
     console.error(error.stack);
     throw new Error("Couldn't delete workout");
@@ -183,14 +184,14 @@ export const deleteWorkoutById = async (
 export const createNewWorkout = async (
   userId: string,
   name: string
-): Promise<string | null> => {
+): Promise<string> => {
   try {
     const sql =
       'INSERT INTO workouts (user_id, name) VALUES ($1, $2) RETURNING id';
     const newWorkoutResult = await db.query(sql, [userId, name]);
     const newWorkoutId = newWorkoutResult.rows[0].id;
     if (!newWorkoutId) {
-      return null;
+      throw new Error();
     }
     return newWorkoutId;
   } catch (error) {

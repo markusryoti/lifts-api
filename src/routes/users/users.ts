@@ -8,16 +8,12 @@ router.get('/', auth, async (req: any, res: any) => {
   const reqUser = req.user;
 
   try {
-    const user: DbUser | null = await getUserWithUsernameOrEmail(
+    const user: DbUser = await getUserWithUsernameOrEmail(
       'username',
       reqUser.username
     );
 
-    if (!user) {
-      return res.status(404).json('No user exists with given username');
-    }
-
-    delete user?.password;
+    delete user.password;
 
     return res.send(user);
   } catch (error) {

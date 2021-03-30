@@ -59,7 +59,7 @@ export const seeIfMovementInMovementTable = async (
  **/
 export const addMovementToMovementTable = async (
   name: string
-): Promise<DbMovementObject | null> => {
+): Promise<DbMovementObject> => {
   try {
     const sql = 'INSERT INTO movements (name) VALUES ($1) RETURNING *';
     const movementAddResult: DatabaseMovementResponse = await db.query(sql, [
@@ -69,7 +69,7 @@ export const addMovementToMovementTable = async (
     if (movement) {
       return movement;
     }
-    return null;
+    throw new Error();
   } catch (error) {
     console.error(error.stack);
     throw new Error("Couldn't add movement");
@@ -144,7 +144,7 @@ export const checkByNameIfMovementInUserMovements = async (
 export const addMovementToUserMovementTable = async (
   movementId: string,
   userId: string
-): Promise<DbUserMovementObject | null> => {
+): Promise<DbUserMovementObject> => {
   try {
     const sql = `
       INSERT INTO user_movements (movement_id, user_id)
@@ -157,7 +157,7 @@ export const addMovementToUserMovementTable = async (
     if (userMovement) {
       return userMovement;
     }
-    return null;
+    throw new Error();
   } catch (error) {
     console.error(error.stack);
     throw new Error("Couldn't add to user movements");
@@ -172,7 +172,7 @@ export const addMovementToUserMovementTable = async (
  **/
 export const getMovementAndUserMovements = async (
   movementId: string
-): Promise<DbUserMovementAndMovementJoin | null> => {
+): Promise<DbUserMovementAndMovementJoin> => {
   try {
     const sql = `
       SELECT user_movements.id AS user_movement_id,
@@ -187,7 +187,7 @@ export const getMovementAndUserMovements = async (
     if (userMovement) {
       return userMovement;
     }
-    return null;
+    throw new Error();
   } catch (error) {
     console.error(error.stack);
     throw new Error("Couldn't execute query");
@@ -204,7 +204,7 @@ export const getMovementAndUserMovements = async (
 export const getUserMovementIdByMovementName = async (
   movementName: string,
   userId: string
-): Promise<string | null> => {
+): Promise<string> => {
   try {
     const sql = `
         SELECT * FROM user_movements
@@ -217,7 +217,7 @@ export const getUserMovementIdByMovementName = async (
       userId,
     ]);
     const userMovementId = userMovementIdQueryResult.rows[0].id;
-    if (!userMovementId) return null;
+    if (!userMovementId) throw new Error();
     return userMovementId;
   } catch (error) {
     console.error(error.stack);

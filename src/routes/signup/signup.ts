@@ -23,7 +23,6 @@ router.post('/', async (req: any, res: any) => {
 
   try {
     const existingUser = await getUserWithUsernameOrEmail('email', email);
-    console.log(existingUser);
 
     if (existingUser) {
       return res.status(403).json('User with email already exists');
@@ -34,15 +33,11 @@ router.post('/', async (req: any, res: any) => {
       parseInt(process.env.SALT_ROUNDS as string)
     );
 
-    const newUser: DbUser | null = await createNewUser(
+    const newUser: DbUser = await createNewUser(
       username,
       email,
       hashedPassword
     );
-
-    if (!newUser) {
-      return res.status(500).json('Error occured while creating a new user');
-    }
 
     const payload = {
       id: newUser.id,

@@ -27,15 +27,7 @@ router.post('/', async (req: any, res: any) => {
     }
 
     const loginType = checkLoginType(loginValue);
-
-    const user: DbUser | null = await getUserWithUsernameOrEmail(
-      loginType,
-      loginValue
-    );
-
-    if (!user) {
-      return res.status(404).json('No user with given username/email');
-    }
+    const user = await getUserWithUsernameOrEmail(loginType, loginValue);
 
     if (!bcrypt.compareSync(password, user.password as string)) {
       return res.status(403).json("Passwords don't match");

@@ -76,11 +76,8 @@ const addMissingSets = async (
         userMovementIds[set.movement_name],
         workoutId
       );
-      if (newSet) {
-        setsWithAddedIds.push({ ...newSet, movement_name: set.movement_name });
-        continue;
-      }
-      throw new Error('Error while updating set values');
+      setsWithAddedIds.push({ ...newSet, movement_name: set.movement_name });
+      continue;
     }
     setsWithAddedIds.push(set);
   }
@@ -95,10 +92,7 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
   try {
     const workoutName = editedWorkout.workout_name;
 
-    const nameUpdateResult = await updateWorkoutName(workoutName, workoutId);
-    if (!nameUpdateResult) {
-      return res.sendStatus(500);
-    }
+    await updateWorkoutName(workoutName, workoutId);
 
     const movementNames = editedWorkout.sets.map(set => set.movement_name);
     const uniqueNames = [...new Set(movementNames)];
@@ -112,9 +106,6 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
 
       if (!movementRow) {
         const newMovement = await addMovementToMovementTable(name);
-        if (!newMovement) {
-          return res.sendStatus(500);
-        }
         movementId = newMovement.id.toString();
       } else {
         movementId = movementRow.id.toString();
@@ -127,11 +118,6 @@ router.put('/:workoutId', auth, async (req: any, res: any) => {
           movementId,
           userId
         );
-
-        if (!userMovementResponse) {
-          res.sendStatus(500);
-          return;
-        }
         userMovementId = userMovementResponse.id;
       } else {
         userMovementId = userMovementRow.user_movement_id;
@@ -165,10 +151,7 @@ router.delete('/:workoutId', auth, async (req: any, res: any) => {
   const { workoutId } = req.params;
 
   try {
-    const success = await deleteWorkoutById(workoutId, userId);
-    if (!success) {
-      return res.sendStatus(500);
-    }
+    await deleteWorkoutById(workoutId, userId);
     return res.sendStatus(200);
   } catch (error) {
     console.log(error.stack);
@@ -188,20 +171,8 @@ router.delete(
         decodeURI(movementNameToDelete),
         userId
       );
-      if (!userMovementId) {
-        res.sendStatus(500);
-        return;
-      }
 
-      const deleteSuccess = await deleteMovementFromWorkout(
-        workoutId,
-        userId,
-        userMovementId
-      );
-      if (!deleteSuccess) {
-        res.sendStatus(500);
-        return;
-      }
+      await deleteMovementFromWorkout(workoutId, userId, userMovementId);
 
       return res.sendStatus(200);
     } catch (error) {
@@ -218,9 +189,6 @@ router.post('/new', auth, async (req: any, res: any) => {
   try {
     // Create a new workout
     const newWorkoutId = await createNewWorkout(userId, workout.workout_name);
-    if (!newWorkoutId) {
-      return res.sendStatus(500);
-    }
 
     const movementNames: string[] = workout.sets.map(
       item => item.movement_name
@@ -247,25 +215,25 @@ router.post('/new', auth, async (req: any, res: any) => {
   }
 });
 
+const inputsAreValid = (
+  reps: number,
+  userId: number,
+  userMovementId: number
+): boolean => {
+  if (
+    reps === undefined ||
+    userId === undefined ||
+    userMovementId === undefined
+  )
+    return false;
+  return true;
+};
+
 router.post('/:workoutId/sets/', auth, async (req: any, res: any) => {
   const userId = req.user.id;
 
   const { workoutId } = req.params;
   const { reps, weight, userMovementId } = req.body;
-
-  const inputsAreValid = (
-    reps: number,
-    userId: number,
-    userMovementId: number
-  ): boolean => {
-    if (
-      reps === undefined ||
-      userId === undefined ||
-      userMovementId === undefined
-    )
-      return false;
-    return true;
-  };
 
   try {
     if (!inputsAreValid(reps, userId, userMovementId)) {
@@ -283,9 +251,6 @@ router.post('/:workoutId/sets/', auth, async (req: any, res: any) => {
       userMovementId,
       workoutId
     );
-    if (!addedSet) {
-      return res.sendStatus(500);
-    }
 
     return res.send(addedSet);
   } catch (error) {
@@ -302,10 +267,7 @@ router.delete(
     const { setId } = req.params;
 
     try {
-      const deleteSuccess = await deleteSetByIdAndUserId(setId, userId);
-      if (!deleteSuccess) {
-        return res.sendStatus(500);
-      }
+      await deleteSetByIdAndUserId(setId, userId);
       res.sendStatus(200);
     } catch (error) {
       console.log(error.stack);

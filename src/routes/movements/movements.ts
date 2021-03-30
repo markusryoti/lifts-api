@@ -35,11 +35,7 @@ router.post('/new', async (req: any, res: any) => {
 
     //   Finally return the join of movements and user_movements tables
     const userMovementJoin = await getMovementAndUserMovements(movementId);
-    if (userMovementJoin) {
-      return res.send(userMovementJoin);
-    }
-
-    return res.sendStatus(500); // Something went wrong
+    return res.send(userMovementJoin);
   } catch (error) {
     console.log(error.stack);
     return res.sendStatus(500);
